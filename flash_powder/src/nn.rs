@@ -4,6 +4,7 @@
 //!
 //! This is not exposed at all through the stable API, so this is a pure rust implementation.
 
+use anyhow;
 use torch_stable::StableTorchResult;
 
 use crate::functional;
@@ -66,6 +67,10 @@ impl StateDict {
 
 pub trait StateDictAdaptor {
     fn tensor(&self, name: &str) -> Option<Tensor>;
+    fn tensor_required(&self, name: &str) -> StableTorchResult<Tensor> {
+        self.tensor(name)
+            .ok_or(anyhow::format_err!("missing required tensor '{name}'"))
+    }
     fn namespaced(&self, name: &str) -> NamespacedStateDictAdaptor<'_>;
 }
 
@@ -170,6 +175,13 @@ impl Module for Sequential {
         }
         Ok(m)
     }
+    fn load_state_dict(&mut self, dict: &dyn StateDictAdaptor) -> StableTorchResult<()> {
+        for (i, v) in self.modules.iter_mut().enumerate() {
+            let name = format!("{i}");
+            v.load_state_dict(&dict.namespaced(&name))?
+        }
+        Ok(())
+    }
 }
 
 /// Conv2d
@@ -191,6 +203,11 @@ impl Module for Conv2d {
         m.add_parameter("weight", self.weight.clone())?;
         m.add_optional_parameter("bias", self.bias.clone())?;
         Ok(m)
+    }
+    fn load_state_dict(&mut self, dict: &dyn StateDictAdaptor) -> StableTorchResult<()> {
+        self.weight = dict.tensor_required("weight")?;
+        self.bias = dict.tensor("bias");
+        Ok(())
     }
 }
 
@@ -239,6 +256,11 @@ impl Module for Linear {
         m.add_parameter("weight", self.weight.clone())?;
         m.add_optional_parameter("bias", self.bias.clone())?;
         Ok(m)
+    }
+    fn load_state_dict(&mut self, dict: &dyn StateDictAdaptor) -> StableTorchResult<()> {
+        self.weight = dict.tensor_required("weight")?;
+        self.bias = dict.tensor("bias");
+        Ok(())
     }
 }
 
