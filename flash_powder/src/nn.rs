@@ -42,10 +42,11 @@ impl StateDict {
         self.add_data(name, Data::Buffer(value))
     }
     pub fn add_data(&mut self, name: &str, value: Data) -> StableTorchResult<()> {
-        self.map
-            .insert(name.to_owned(), value)
-            .ok_or(anyhow::anyhow!("entry with name {name} already existed"))
-            .map(|_| ())
+        if self.map.contains_key(name) {
+            anyhow::bail!("entry with name {name} already existed")
+        }
+        let _ = self.map.insert(name.to_owned(), value);
+        Ok(())
     }
     pub fn add_state_dict(&mut self, name: &str, mut value: StateDict) -> StableTorchResult<()> {
         // Munge paths and concat.
@@ -65,7 +66,9 @@ impl StateDict {
 
 pub trait StateDictAdaptor {
     fn tensor(&self, name: &str) -> Option<Tensor>;
+    fn namespaced(&self, name: &str) -> NamespacedStateDictAdaptor<'_>;
 }
+
 impl StateDictAdaptor for StateDict {
     fn tensor(&self, name: &str) -> Option<Tensor> {
         if let Some(record) = self.map.get(name) {
@@ -75,6 +78,27 @@ impl StateDictAdaptor for StateDict {
             }
         } else {
             None
+        }
+    }
+    fn namespaced(&self, name: &str) -> NamespacedStateDictAdaptor<'_> {
+        NamespacedStateDictAdaptor {
+            state_dict: self,
+            prefix: name.to_owned(),
+        }
+    }
+}
+pub struct NamespacedStateDictAdaptor<'a> {
+    state_dict: &'a dyn StateDictAdaptor,
+    prefix: String,
+}
+impl<'a> StateDictAdaptor for NamespacedStateDictAdaptor<'a> {
+    fn tensor(&self, name: &str) -> Option<Tensor> {
+        self.state_dict.tensor(&format!("{}.{}", self.prefix, name))
+    }
+    fn namespaced(&self, name: &str) -> NamespacedStateDictAdaptor<'_> {
+        NamespacedStateDictAdaptor {
+            state_dict: self,
+            prefix: name.to_owned(),
         }
     }
 }
@@ -215,5 +239,35 @@ impl Module for Linear {
         m.add_parameter("weight", self.weight.clone())?;
         m.add_optional_parameter("bias", self.bias.clone())?;
         Ok(m)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::prelude::*;
+
+    #[test]
+    fn test_flash_powder_state_dict() -> StableTorchResult<()> {
+        let mut s = StateDict::default();
+        let one: Tensor = (1.0,).try_into()?;
+        let two: Tensor = (2.0,).try_into()?;
+        let three: Tensor = (3.0,).try_into()?;
+        s.add_buffer("foo", one.clone())?;
+        assert_eq!(s.add_buffer("foo", one.clone()).is_err(), true);
+        s.add_buffer("foo.bar", two.clone())?;
+        s.add_buffer("foo.bar.buz", three.clone())?;
+
+        assert_eq!(s.tensor("foo").unwrap().as_f64()?, &1.0);
+        assert_eq!(s.tensor("foo.bar").unwrap().as_f64()?, &2.0);
+        assert_eq!(s.tensor("foo.bar.buz").unwrap().as_f64()?, &3.0);
+
+        let foo = s.namespaced("foo");
+        assert_eq!(foo.tensor("bar").unwrap().as_f64()?, &2.0);
+        assert_eq!(foo.tensor("bar.buz").unwrap().as_f64()?, &3.0);
+
+        let bar = foo.namespaced("bar");
+        assert_eq!(bar.tensor("buz").unwrap().as_f64()?, &3.0);
+        Ok(())
     }
 }
