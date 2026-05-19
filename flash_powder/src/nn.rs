@@ -148,7 +148,7 @@ impl<'a> StateDictAdaptor for NamespacedStateDictAdaptor<'a> {
 /// - Parameters; Tensors that record gradient, typically weights, like `weight` of linear.
 /// - Buffers; Tensor that do not record gradients, typically updated during forward step; `mean`, `variance` of BatchNorm.
 /// - Additionally state, not necessarily tensors, required for implementation or configuration of a Module.
-pub trait Module: std::fmt::Debug + dyn_clone::DynClone + AsAny {
+pub trait Module: std::fmt::Debug + AsAny {
     fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error>;
     // These look relevant;
     // register_buffer
@@ -183,12 +183,12 @@ pub trait Module: std::fmt::Debug + dyn_clone::DynClone + AsAny {
     }
 }
 
-dyn_clone::clone_trait_object!(Module);
+// dyn_clone::clone_trait_object!(Module);
 
 /// Sequential module
 ///
 /// - pytorch equivalent; <https://docs.pytorch.org/docs/2.12/generated/torch.nn.Sequential.html>
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct Sequential {
     modules: Vec<Box<dyn Module>>,
 }

@@ -21,27 +21,33 @@ use safetensors::SafeTensors;
 
 use flash_powder as fp;
 use flash_powder::functional;
+use flash_powder::nn;
 use flash_powder::prelude::*;
-use fp::{DType, Device, Tensor};
+use fp::{DType, Device, Ten, Tensor};
 
 // Bit of tooling for type erasure.
-trait ForwardLayer {
-    fn forward(&self, tensor: &Tensor) -> Result<Tensor, anyhow::Error>;
-}
-type ForwardFun = dyn Fn(&Tensor) -> Result<Tensor, anyhow::Error>;
+use nn::Module as ForwardLayer;
+type ForwardFun = dyn Fn(&Ten) -> Result<Tensor, anyhow::Error>;
+
 struct LambdaForward {
     f: Box<ForwardFun>,
 }
+impl std::fmt::Debug for LambdaForward {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LambdaForward").finish()
+    }
+}
+
 impl LambdaForward {
     fn new<F>(f: F) -> Self
     where
-        F: Fn(&Tensor) -> Result<Tensor, anyhow::Error> + 'static,
+        F: Fn(&Ten) -> Result<Tensor, anyhow::Error> + 'static,
     {
         Self { f: Box::new(f) }
     }
 }
 impl ForwardLayer for LambdaForward {
-    fn forward(&self, tensor: &Tensor) -> Result<Tensor, anyhow::Error> {
+    fn forward(&self, tensor: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
         (self.f)(tensor)
     }
 }
@@ -116,7 +122,7 @@ impl VGG {
         let mut r: Tensor = input.clone();
         // Run it through the layers.
         for f in self.layers.iter() {
-            r = f.forward(&r)?;
+            r = f.forward(&r.ten()?)?;
         }
         // do some avgpool.
         r = fp::functional::adaptive_avg_pool2d(&r, (7, 7))?;
@@ -125,7 +131,7 @@ impl VGG {
 
         // Run it through the classifier.
         for f in self.classifier.iter() {
-            r = f.forward(&r)?;
+            r = f.forward(&r.ten()?)?;
         }
         Ok(r)
     }
@@ -160,7 +166,7 @@ fn create_linear(
             None
         }
     };
-    Ok(Box::new(LambdaForward::new(move |input: &Tensor| {
+    Ok(Box::new(LambdaForward::new(move |input: &Ten| {
         let bias_ref = bias.as_ref();
         let res = functional::linear(input, &weights, bias_ref)?;
         Ok(res)
@@ -190,7 +196,7 @@ fn create_conv2d(
             None
         }
     };
-    Ok(Box::new(LambdaForward::new(move |t: &Tensor| {
+    Ok(Box::new(LambdaForward::new(move |t: &Ten| {
         let bias_ref = bias.as_ref();
         let conv_res = functional::conv2d(t, &weights, bias_ref, &conv2d_options)?;
         let res = functional::relu(&conv_res)?;
@@ -201,13 +207,13 @@ fn create_conv2d(
 
 /// Helper to create a maxpool layer
 fn create_maxpool(kernel_size: i64) -> Box<dyn ForwardLayer> {
-    Box::new(LambdaForward::new(move |input: &Tensor| {
+    Box::new(LambdaForward::new(move |input: &Ten| {
         fp::functional::max_pool2d(input, (kernel_size, kernel_size), &Default::default())
     }))
 }
 /// Helper to create a relu layer
 fn create_relu() -> Box<dyn ForwardLayer> {
-    Box::new(LambdaForward::new(move |input: &Tensor| {
+    Box::new(LambdaForward::new(move |input: &Ten| {
         fp::functional::relu(input)
     }))
 }

@@ -33,10 +33,10 @@ impl Default for Conv2dOptions {
 ///
 /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L1757)
 /// - [pytorch equivalent](https://docs.pytorch.org/docs/2.11/generated/torch.nn.functional.conv2d.html)
-pub fn conv2d<T: TensorAccess>(
-    input: &T,
-    weight: &T,
-    bias: Option<&T>,
+pub fn conv2d<I: TensorAccess, W: TensorAccess, B: TensorAccess>(
+    input: &I,
+    weight: &W,
+    bias: Option<&B>,
     options: &Conv2dOptions,
 ) -> StableTorchResult<Tensor> {
     // return wrap(dispatch_conv2d(r.tensor(0), r.tensor(1), r.tensor(2), r.intlist(3), r.intlist(4), r.intlist(5), r.toInt64(6)));
