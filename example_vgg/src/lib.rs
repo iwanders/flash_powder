@@ -91,7 +91,10 @@ impl VGG {
             let layer_name = format!("features.{feature_counter}");
             if *v == 'M' as u32 {
                 // should be maxpool2d.
-                layers.push(create_maxpool(2));
+                layers.push(Box::new(nn::MaxPool2d {
+                    kernel_size: (2, 2),
+                    options: Default::default(),
+                }));
                 feature_counter += 1;
             } else {
                 layers.push(create_conv2d(tensors, &layer_name, use_cuda)?);
@@ -105,12 +108,12 @@ impl VGG {
         // and then the group called classifier
         let mut classifier: nn::Sequential = Default::default();
         classifier.push(create_linear(tensors, &format!("classifier.0"), use_cuda)?);
-        classifier.push(create_relu());
+        classifier.push(nn::ReLU.into_boxed());
         // dropout
 
         // next linear block
         classifier.push(create_linear(tensors, &format!("classifier.3"), use_cuda)?);
-        classifier.push(create_relu());
+        classifier.push(nn::ReLU.into_boxed());
         // dropout
 
         // last linear.
@@ -205,19 +208,6 @@ fn create_conv2d(
 
         Ok(res)
     })))
-}
-
-/// Helper to create a maxpool layer
-fn create_maxpool(kernel_size: i64) -> Box<dyn ForwardLayer> {
-    Box::new(LambdaForward::new(move |input: &Ten| {
-        fp::functional::max_pool2d(input, (kernel_size, kernel_size), &Default::default())
-    }))
-}
-/// Helper to create a relu layer
-fn create_relu() -> Box<dyn ForwardLayer> {
-    Box::new(LambdaForward::new(move |input: &Ten| {
-        fp::functional::relu(input)
-    }))
 }
 
 /// Converter to go from safetnsors DType to flash_powder DType
