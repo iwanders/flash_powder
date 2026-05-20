@@ -61,8 +61,8 @@ const CFG_A: &[u32] = &[
 
 /// VGG struct with layers and classifier.
 pub struct VGG {
-    layers: Vec<Box<dyn ForwardLayer>>,
-    classifier: Vec<Box<dyn ForwardLayer>>,
+    features: nn::Sequential,
+    classifier: nn::Sequential,
 }
 impl VGG {
     /// Create a new vgg config as per the layer specification and the provided weights.
@@ -99,10 +99,11 @@ impl VGG {
                 feature_counter += 2;
             }
         }
+        let features = layers.drain(..).collect();
 
         // https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L43
         // and then the group called classifier
-        let mut classifier: Vec<Box<dyn ForwardLayer>> = vec![];
+        let mut classifier: nn::Sequential = Default::default();
         classifier.push(create_linear(tensors, &format!("classifier.0"), use_cuda)?);
         classifier.push(create_relu());
         // dropout
@@ -115,24 +116,25 @@ impl VGG {
         // last linear.
         classifier.push(create_linear(tensors, &format!("classifier.6"), use_cuda)?);
 
-        Ok(VGG { layers, classifier })
+        Ok(VGG {
+            features,
+            classifier,
+        })
     }
 
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, anyhow::Error> {
         let mut r: Tensor = input.clone();
         // Run it through the layers.
-        for f in self.layers.iter() {
-            r = f.forward(&r.ten()?)?;
-        }
+        r = self.features.forward(&r.ten()?)?;
+
         // do some avgpool.
         r = fp::functional::adaptive_avg_pool2d(&r, (7, 7))?;
         // do a flatten.
         r = r.flatten(1, None)?;
 
         // Run it through the classifier.
-        for f in self.classifier.iter() {
-            r = f.forward(&r.ten()?)?;
-        }
+        r = self.classifier.forward(&r.ten()?)?;
+
         Ok(r)
     }
 
