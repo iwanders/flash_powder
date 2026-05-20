@@ -7,6 +7,7 @@
 use anyhow;
 use torch_stable::StableTorchResult;
 
+use crate::factory::{TensorFactory, TensorOptions};
 use crate::functional;
 use crate::{Ten, Tensor, core_methods::CoreMethods};
 
@@ -303,6 +304,32 @@ impl Module for Conv2d {
         self.weight = dict.tensor_required("weight")?;
         self.bias = dict.tensor("bias");
         Ok(())
+    }
+}
+impl Conv2d {
+    /// A new conv2d layer, without bias.
+    pub fn new(
+        in_channels: usize,
+        out_channels: usize,
+        kernel_size: (i64, i64),
+        options: functional::Conv2dOptions,
+    ) -> StableTorchResult<Conv2d> {
+        // Weights is; [out_channels, in_channels / groups, kernel_size[0], kernel_size[1]]
+        let channels_div_groups = ((in_channels as i64) / options.groups) as usize;
+        let weight = Tensor::zeros(
+            &[
+                out_channels,
+                channels_div_groups,
+                kernel_size.0 as usize,
+                kernel_size.1 as usize,
+            ],
+            &TensorOptions::default(),
+        )?;
+        Ok(Self {
+            weight,
+            bias: None,
+            options,
+        })
     }
 }
 

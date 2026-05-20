@@ -87,6 +87,7 @@ impl VGG {
 
         // First, the group called 'features'.
         let mut feature_counter = 0;
+        let mut in_channels = 3;
         for v in cfg.iter() {
             let layer_name = format!("features.{feature_counter}");
             if *v == 'M' as u32 {
@@ -97,6 +98,14 @@ impl VGG {
                 }));
                 feature_counter += 1;
             } else {
+                let conv2d_options = functional::Conv2dOptions {
+                    stride: (1, 1),
+                    padding: (1, 1),
+                    ..Default::default()
+                };
+                let layer = nn::Conv2d::new(in_channels, *v as usize, (3, 3), conv2d_options)?;
+
+                in_channels = *v as usize;
                 layers.push(create_conv2d(tensors, &layer_name, use_cuda)?);
                 // + 1 for conv2d, +1 for relu.
                 feature_counter += 2;
@@ -238,6 +247,29 @@ fn safetensor_to_tensor(tensors: &SafeTensors, name: &str) -> Result<Tensor, any
         bail!("could not find safetensor {name}")
     }
 }
+
+/*
+
+
+struct SafeTensorsAdaptor<'a, 's> {
+    t: &'a SafeTensors<'s>,
+    namespace: Vec<String>,
+}
+
+impl<'a, 's> nn::StateDictAdaptor for SafeTensorsAdaptor<'a, 's> {
+    fn tensor(&self, name: &str) -> Option<Tensor> {
+        safetensor_to_tensor(self.t, name).ok()
+    }
+    fn namespaced(&'a self, name: &str) -> SafeTensorsAdaptor<'a, 's> {
+        let mut namespace = self.namespace.clone();
+        namespace.push(name.to_owned());
+        SafeTensorsAdaptor {
+            t: self.t,
+            namespace,
+        }
+    }
+}
+*/
 
 /// Convert dynamic image into [1, 3, h, w] Tensor as floats.
 fn image_to_float_tensor(
