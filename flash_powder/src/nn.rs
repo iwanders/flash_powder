@@ -95,16 +95,16 @@ impl StateDict {
     }
 }
 
-pub trait StateDictAdaptor {
+pub trait StateDictAdaptor<'data> {
     fn tensor(&self, name: &str) -> Option<Tensor>;
     fn tensor_required(&self, name: &str) -> StableTorchResult<Tensor> {
         self.tensor(name)
             .ok_or(anyhow::format_err!("missing required tensor '{name}'"))
     }
-    fn namespaced(&self, name: &str) -> NamespacedStateDictAdaptor<'_>;
+    fn namespaced<'s>(&'s self, name: &str) -> NamespacedStateDictAdaptor<'s, 'data>;
 }
 
-impl StateDictAdaptor for StateDict {
+impl<'data> StateDictAdaptor<'data> for StateDict {
     fn tensor(&self, name: &str) -> Option<Tensor> {
         if let Some(record) = self.map.get(name) {
             match record {
@@ -115,25 +115,28 @@ impl StateDictAdaptor for StateDict {
             None
         }
     }
-    fn namespaced(&self, name: &str) -> NamespacedStateDictAdaptor<'_> {
+    fn namespaced<'s>(&'s self, name: &str) -> NamespacedStateDictAdaptor<'s, 'data> {
         NamespacedStateDictAdaptor {
             state_dict: self,
-            prefix: name.to_owned(),
+            prefix: vec![name.to_owned()],
         }
     }
 }
-pub struct NamespacedStateDictAdaptor<'a> {
-    state_dict: &'a dyn StateDictAdaptor,
-    prefix: String,
+pub struct NamespacedStateDictAdaptor<'s, 'data> {
+    state_dict: &'s dyn StateDictAdaptor<'data>,
+    prefix: Vec<String>,
 }
-impl<'a> StateDictAdaptor for NamespacedStateDictAdaptor<'a> {
+impl<'s, 'data> StateDictAdaptor<'data> for NamespacedStateDictAdaptor<'s, 'data> {
     fn tensor(&self, name: &str) -> Option<Tensor> {
-        self.state_dict.tensor(&format!("{}.{}", self.prefix, name))
+        let r = self.prefix.join(".") + "." + name;
+        self.state_dict.tensor(&r)
     }
-    fn namespaced(&self, name: &str) -> NamespacedStateDictAdaptor<'_> {
+    fn namespaced(&self, name: &str) -> NamespacedStateDictAdaptor<'s, 'data> {
+        let mut prefix = self.prefix.clone();
+        prefix.push(name.to_owned());
         NamespacedStateDictAdaptor {
-            state_dict: self,
-            prefix: name.to_owned(),
+            state_dict: self.state_dict,
+            prefix,
         }
     }
 }
@@ -171,7 +174,7 @@ pub trait Module: std::fmt::Debug + AsAny {
     fn state_dict(&self) -> StableTorchResult<StateDict> {
         Ok(Default::default())
     }
-    fn load_state_dict(&mut self, dict: &dyn StateDictAdaptor) -> StableTorchResult<()> {
+    fn load_state_dict<'a>(&mut self, dict: &dyn StateDictAdaptor<'a>) -> StableTorchResult<()> {
         let _ = dict;
         Ok(())
     }
