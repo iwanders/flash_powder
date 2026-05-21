@@ -248,28 +248,26 @@ fn safetensor_to_tensor(tensors: &SafeTensors, name: &str) -> Result<Tensor, any
     }
 }
 
-/*
-
-
-struct SafeTensorsAdaptor<'a, 's> {
-    t: &'a SafeTensors<'s>,
-    namespace: Vec<String>,
+#[derive(Copy, Clone, Debug)]
+pub struct OurSafeTensors<'a, 'd> {
+    st: &'a SafeTensors<'d>,
+}
+impl<'a, 'd> OurSafeTensors<'a, 'd> {
+    pub fn new(st: &'a SafeTensors<'d>) -> Self {
+        OurSafeTensors { st }
+    }
 }
 
-impl<'a, 's> nn::StateDictAdaptor for SafeTensorsAdaptor<'a, 's> {
+impl<'a, 'd> nn::StateDictAdaptor for OurSafeTensors<'a, 'd> {
     fn tensor(&self, name: &str) -> Option<Tensor> {
-        safetensor_to_tensor(self.t, name).ok()
-    }
-    fn namespaced(&'a self, name: &str) -> SafeTensorsAdaptor<'a, 's> {
-        let mut namespace = self.namespace.clone();
-        namespace.push(name.to_owned());
-        SafeTensorsAdaptor {
-            t: self.t,
-            namespace,
-        }
+        safetensor_to_tensor(self.st, name).ok()
     }
 }
-*/
+impl<'a, 'd> nn::StateDictReader for OurSafeTensors<'a, 'd> {
+    fn inner(&self) -> &dyn nn::StateDictAdaptor {
+        self
+    }
+}
 
 /// Convert dynamic image into [1, 3, h, w] Tensor as floats.
 fn image_to_float_tensor(

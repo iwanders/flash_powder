@@ -95,16 +95,15 @@ impl StateDict {
     }
 }
 
-pub trait StateDictAdaptor<'data> {
+pub trait StateDictAdaptor {
     fn tensor(&self, name: &str) -> Option<Tensor>;
     fn tensor_required(&self, name: &str) -> StableTorchResult<Tensor> {
         self.tensor(name)
             .ok_or(anyhow::format_err!("missing required tensor '{name}'"))
     }
-    fn namespaced<'s>(&'s self, name: &str) -> NamespacedStateDictAdaptor<'s, 'data>;
 }
 
-impl<'data> StateDictAdaptor<'data> for StateDict {
+impl StateDictAdaptor for StateDict {
     fn tensor(&self, name: &str) -> Option<Tensor> {
         if let Some(record) = self.map.get(name) {
             match record {
@@ -115,29 +114,46 @@ impl<'data> StateDictAdaptor<'data> for StateDict {
             None
         }
     }
-    fn namespaced<'s>(&'s self, name: &str) -> NamespacedStateDictAdaptor<'s, 'data> {
+}
+impl StateDictReader for StateDict {
+    fn inner(&self) -> &dyn StateDictAdaptor {
+        self
+    }
+}
+
+pub trait StateDictReader: StateDictAdaptor {
+    fn inner(&self) -> &dyn StateDictAdaptor;
+
+    fn namespace(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn namespaced<'a>(&'a self, name: &str) -> NamespacedStateDictAdaptor<'a> {
+        let mut namespace = self.namespace();
+        namespace.push(name.to_owned());
         NamespacedStateDictAdaptor {
-            state_dict: self,
-            prefix: vec![name.to_owned()],
+            v: self.inner(),
+            namespace,
         }
     }
 }
-pub struct NamespacedStateDictAdaptor<'s, 'data> {
-    state_dict: &'s dyn StateDictAdaptor<'data>,
-    prefix: Vec<String>,
+pub struct NamespacedStateDictAdaptor<'a> {
+    v: &'a dyn StateDictAdaptor,
+    namespace: Vec<String>,
 }
-impl<'s, 'data> StateDictAdaptor<'data> for NamespacedStateDictAdaptor<'s, 'data> {
+
+impl<'a> StateDictReader for NamespacedStateDictAdaptor<'a> {
+    fn inner(&self) -> &'a dyn StateDictAdaptor {
+        self.v
+    }
+    fn namespace(&self) -> Vec<String> {
+        self.namespace.clone()
+    }
+}
+impl<'a> StateDictAdaptor for NamespacedStateDictAdaptor<'a> {
     fn tensor(&self, name: &str) -> Option<Tensor> {
-        let r = self.prefix.join(".") + "." + name;
-        self.state_dict.tensor(&r)
-    }
-    fn namespaced(&self, name: &str) -> NamespacedStateDictAdaptor<'s, 'data> {
-        let mut prefix = self.prefix.clone();
-        prefix.push(name.to_owned());
-        NamespacedStateDictAdaptor {
-            state_dict: self.state_dict,
-            prefix,
-        }
+        let m = self.namespace.join(".") + "." + name;
+        self.inner().tensor(&m)
     }
 }
 
@@ -174,7 +190,7 @@ pub trait Module: std::fmt::Debug + AsAny {
     fn state_dict(&self) -> StableTorchResult<StateDict> {
         Ok(Default::default())
     }
-    fn load_state_dict<'a>(&mut self, dict: &dyn StateDictAdaptor<'a>) -> StableTorchResult<()> {
+    fn load_state_dict<'a>(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
         let _ = dict;
         Ok(())
     }
@@ -215,7 +231,7 @@ impl Module for Sequential {
         }
         Ok(m)
     }
-    fn load_state_dict(&mut self, dict: &dyn StateDictAdaptor) -> StableTorchResult<()> {
+    fn load_state_dict(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
         for (i, v) in self.modules.iter_mut().enumerate() {
             let name = format!("{i}");
             v.load_state_dict(&dict.namespaced(&name))?
@@ -303,7 +319,7 @@ impl Module for Conv2d {
         m.add_optional_parameter("bias", self.bias.clone())?;
         Ok(m)
     }
-    fn load_state_dict(&mut self, dict: &dyn StateDictAdaptor) -> StableTorchResult<()> {
+    fn load_state_dict(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
         self.weight = dict.tensor_required("weight")?;
         self.bias = dict.tensor("bias");
         Ok(())
@@ -382,7 +398,7 @@ impl Module for Linear {
         m.add_optional_parameter("bias", self.bias.clone())?;
         Ok(m)
     }
-    fn load_state_dict(&mut self, dict: &dyn StateDictAdaptor) -> StableTorchResult<()> {
+    fn load_state_dict(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
         self.weight = dict.tensor_required("weight")?;
         self.bias = dict.tensor("bias");
         Ok(())
