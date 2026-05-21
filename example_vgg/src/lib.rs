@@ -68,21 +68,6 @@ pub struct VGG {
 impl VGG {
     /// Create a new vgg config as per the layer specification and the provided weights.
     pub fn new(cfg: &[u32], tensors: &SafeTensors, use_cuda: bool) -> Result<Self, anyhow::Error> {
-        const PRINT_TENSOR_SHAPES: bool = false;
-
-        if PRINT_TENSOR_SHAPES {
-            let mut sorted = tensors.names().clone();
-            sorted.sort();
-
-            for name in sorted {
-                println!("Tensor key: {}", name);
-
-                if let Ok(view) = tensors.tensor(name) {
-                    println!("  Shape: {:?}", view.shape());
-                }
-            }
-        }
-
         // let our_safetensor = OurSafeTensors { st: tensors };
 
         // Okay... so we iterate over cfg... build the layers and then append them to ourselves? How hard can it be.
@@ -122,17 +107,21 @@ impl VGG {
         // https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L43
         // and then the group called classifier
         let mut classifier: nn::Sequential = Default::default();
-        classifier.push(create_linear(tensors, &format!("classifier.0"), use_cuda)?);
+        // classifier.push(create_linear(tensors, &format!("classifier.0"), use_cuda)?);
+        classifier.push(nn::Linear::new(512 * 7 * 7, 4096)?.into_boxed());
         classifier.push(nn::ReLU.into_boxed());
-        // dropout
+        classifier.push(nn::Identity.into_boxed()); // actually a dropout
 
         // next linear block
-        classifier.push(create_linear(tensors, &format!("classifier.3"), use_cuda)?);
+        // classifier.push(create_linear(tensors, &format!("classifier.3"), use_cuda)?);
+        classifier.push(nn::Linear::new(4096, 4096)?.into_boxed());
         classifier.push(nn::ReLU.into_boxed());
-        // dropout
+        classifier.push(nn::Identity.into_boxed()); // actually a dropout
 
         // last linear.
-        classifier.push(create_linear(tensors, &format!("classifier.6"), use_cuda)?);
+        const NUM_CLASSESS: usize = 1000;
+        // classifier.push(create_linear(tensors, &format!("classifier.6"), use_cuda)?);
+        classifier.push(nn::Linear::new(4096, NUM_CLASSESS)?.into_boxed());
 
         Ok(VGG {
             features,
@@ -302,6 +291,20 @@ pub fn main() -> Result<(), anyhow::Error> {
     let data = std::fs::read(weights).expect("Unable to read file");
 
     let tensors = SafeTensors::deserialize(&data)?;
+    const PRINT_TENSOR_SHAPES: bool = false;
+
+    if PRINT_TENSOR_SHAPES {
+        let mut sorted = tensors.names().clone();
+        sorted.sort();
+
+        for name in sorted {
+            println!("Tensor key: {}", name);
+
+            if let Ok(view) = tensors.tensor(name) {
+                println!("  Shape: {:?}", view.shape());
+            }
+        }
+    }
 
     let use_cuda = fp::torch::cuda::is_available();
     let use_cuda = false;
