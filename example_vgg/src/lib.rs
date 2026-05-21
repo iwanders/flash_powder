@@ -24,33 +24,7 @@ use flash_powder::functional;
 use flash_powder::nn;
 use flash_powder::prelude::*;
 use fp::{DType, Device, Ten, Tensor};
-
-// Bit of tooling for type erasure.
-use nn::Module as ForwardLayer;
-type ForwardFun = dyn Fn(&Ten) -> Result<Tensor, anyhow::Error>;
-
-struct LambdaForward {
-    f: Box<ForwardFun>,
-}
-impl std::fmt::Debug for LambdaForward {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("LambdaForward").finish()
-    }
-}
-
-impl LambdaForward {
-    fn new<F>(f: F) -> Self
-    where
-        F: Fn(&Ten) -> Result<Tensor, anyhow::Error> + 'static,
-    {
-        Self { f: Box::new(f) }
-    }
-}
-impl ForwardLayer for LambdaForward {
-    fn forward(&self, tensor: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
-        (self.f)(tensor)
-    }
-}
+use nn::Module;
 
 // The config, as per https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L91
 // but then as integers.
@@ -67,61 +41,48 @@ pub struct VGG {
 }
 impl VGG {
     /// Create a new vgg config as per the layer specification and the provided weights.
-    pub fn new(cfg: &[u32], tensors: &SafeTensors, use_cuda: bool) -> Result<Self, anyhow::Error> {
-        // let our_safetensor = OurSafeTensors { st: tensors };
-
-        // Okay... so we iterate over cfg... build the layers and then append them to ourselves? How hard can it be.
-        let mut layers: Vec<Box<dyn ForwardLayer>> = vec![];
-
-        // First, the group called 'features'.
-        let mut feature_counter = 0;
+    pub fn new(cfg: &[u32]) -> Result<Self, anyhow::Error> {
+        // Okay... so we iterate over cfg... build the layers up.
+        let mut features: nn::Sequential = Default::default();
         let mut in_channels = 3;
         for v in cfg.iter() {
-            let layer_name = format!("features.{feature_counter}");
             if *v == 'M' as u32 {
-                // should be maxpool2d.
-                layers.push(Box::new(nn::MaxPool2d {
+                // 'M' denotes maxpool layer.
+                features.push(nn::MaxPool2d {
                     kernel_size: (2, 2),
                     options: Default::default(),
-                }));
-                feature_counter += 1;
+                });
             } else {
                 let conv2d_options = functional::Conv2dOptions {
                     stride: (1, 1),
                     padding: (1, 1),
                     ..Default::default()
                 };
-                let mut layer = nn::Conv2d::new(in_channels, *v as usize, (3, 3), conv2d_options)?;
-                // use nn::StateDictReader;
-                // let ns = our_safetensor.namespaced(&layer_name);
-                // layer.load_state_dict(&ns)?;
+                let layer = nn::Conv2d::new(in_channels, *v as usize, (3, 3), conv2d_options)?;
+                features.push(layer);
+                features.push(nn::ReLU);
                 in_channels = *v as usize;
-                layers.push(Box::new(layer));
-                layers.push(Box::new(nn::ReLU));
-                // + 1 for conv2d, +1 for relu.
-                feature_counter += 2;
             }
         }
-        let features = layers.drain(..).collect();
+
+        // could also do:
+        // let features = layers.drain(..).collect();
 
         // https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L43
         // and then the group called classifier
         let mut classifier: nn::Sequential = Default::default();
-        // classifier.push(create_linear(tensors, &format!("classifier.0"), use_cuda)?);
-        classifier.push(nn::Linear::new(512 * 7 * 7, 4096)?.into_boxed());
-        classifier.push(nn::ReLU.into_boxed());
-        classifier.push(nn::Identity.into_boxed()); // actually a dropout
+        classifier.push(nn::Linear::new(512 * 7 * 7, 4096)?);
+        classifier.push(nn::ReLU);
+        classifier.push(nn::Identity); // actually a dropout, here to keep the indexing for state dict correct.
 
         // next linear block
-        // classifier.push(create_linear(tensors, &format!("classifier.3"), use_cuda)?);
-        classifier.push(nn::Linear::new(4096, 4096)?.into_boxed());
-        classifier.push(nn::ReLU.into_boxed());
-        classifier.push(nn::Identity.into_boxed()); // actually a dropout
+        classifier.push(nn::Linear::new(4096, 4096)?);
+        classifier.push(nn::ReLU);
+        classifier.push(nn::Identity);
 
         // last linear.
         const NUM_CLASSESS: usize = 1000;
-        // classifier.push(create_linear(tensors, &format!("classifier.6"), use_cuda)?);
-        classifier.push(nn::Linear::new(4096, NUM_CLASSESS)?.into_boxed());
+        classifier.push(nn::Linear::new(4096, NUM_CLASSESS)?);
 
         Ok(VGG {
             features,
@@ -134,17 +95,11 @@ impl VGG {
     }
 }
 impl nn::Module for VGG {
+    // https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L65
     fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
-        let mut r: Tensor = input.to_owned()?;
-        // Run it through the layers.
-        r = self.features.forward(&r.ten()?)?;
-
-        // do some avgpool.
+        let mut r = self.features.forward(input)?;
         r = fp::functional::adaptive_avg_pool2d(&r, (7, 7))?;
-        // do a flatten.
         r = r.flatten(1, None)?;
-
-        // Run it through the classifier.
         r = self.classifier.forward(&r.ten()?)?;
 
         Ok(r)
@@ -164,30 +119,6 @@ fn optional_cuda_to(v: Tensor, use_cuda: bool) -> Result<Tensor, anyhow::Error> 
     } else {
         Ok(v)
     }
-}
-
-/// Helper to read a linear layer from the safetensors.
-fn create_linear(
-    tensors: &SafeTensors,
-    layer_name: &str,
-    use_cuda: bool,
-) -> Result<Box<dyn ForwardLayer>, anyhow::Error> {
-    let weights = optional_cuda_to(
-        safetensor_to_tensor(tensors, &format!("{layer_name}.weight"))?,
-        use_cuda,
-    )?;
-    let bias = {
-        if let Ok(v) = safetensor_to_tensor(tensors, &format!("{layer_name}.bias")) {
-            Some(optional_cuda_to(v, use_cuda)?)
-        } else {
-            None
-        }
-    };
-    Ok(Box::new(LambdaForward::new(move |input: &Ten| {
-        let bias_ref = bias.as_ref();
-        let res = functional::linear(input, &weights, bias_ref)?;
-        Ok(res)
-    })))
 }
 
 /// Converter to go from safetnsors DType to flash_powder DType
@@ -311,7 +242,7 @@ pub fn main() -> Result<(), anyhow::Error> {
     println!("cuda available? {use_cuda:?}");
     let our_safetensor = OurSafeTensors { st: &tensors };
 
-    let mut vgg = VGG::new(&CFG_A, &tensors, use_cuda)?;
+    let mut vgg = VGG::new(&CFG_A)?;
     vgg.load_state_dict(&our_safetensor)?;
 
     println!(

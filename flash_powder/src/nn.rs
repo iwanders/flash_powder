@@ -243,8 +243,9 @@ impl Sequential {
     pub fn new() -> Self {
         Default::default()
     }
-    pub fn push<T: Into<Box<dyn Module>>>(&mut self, m: T) {
-        self.modules.push(m.into())
+    pub fn push<T: Sized + 'static + Module>(&mut self, m: T) {
+        let b: Box<dyn Module> = Box::new(m);
+        self.modules.push(b)
     }
     pub fn push_boxed(&mut self, m: Box<dyn Module>) {
         self.modules.push(m)
@@ -280,7 +281,7 @@ impl<T: Module + 'static> FromIterator<T> for Sequential {
         let mut items = Sequential::new();
 
         for item in iter {
-            items.push(item.into_boxed());
+            items.push(item);
         }
 
         items
@@ -292,7 +293,7 @@ impl FromIterator<Box<dyn Module>> for Sequential {
         let mut items = Sequential::new();
 
         for item in iter {
-            items.push(item);
+            items.push_boxed(item);
         }
 
         items
