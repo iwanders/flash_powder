@@ -82,6 +82,8 @@ impl VGG {
             }
         }
 
+        let our_safetensor = OurSafeTensors { st: tensors };
+
         // Okay... so we iterate over cfg... build the layers and then append them to ourselves? How hard can it be.
         let mut layers: Vec<Box<dyn ForwardLayer>> = vec![];
 
@@ -103,10 +105,13 @@ impl VGG {
                     padding: (1, 1),
                     ..Default::default()
                 };
-                let layer = nn::Conv2d::new(in_channels, *v as usize, (3, 3), conv2d_options)?;
-
+                let mut layer = nn::Conv2d::new(in_channels, *v as usize, (3, 3), conv2d_options)?;
+                use nn::StateDictReader;
+                let ns = our_safetensor.namespaced(&layer_name);
+                layer.load_state_dict(&ns)?;
                 in_channels = *v as usize;
-                layers.push(create_conv2d(tensors, &layer_name, use_cuda)?);
+                layers.push(Box::new(layer));
+                layers.push(Box::new(nn::ReLU));
                 // + 1 for conv2d, +1 for relu.
                 feature_counter += 2;
             }
@@ -183,38 +188,6 @@ fn create_linear(
     Ok(Box::new(LambdaForward::new(move |input: &Ten| {
         let bias_ref = bias.as_ref();
         let res = functional::linear(input, &weights, bias_ref)?;
-        Ok(res)
-    })))
-}
-
-/// Helper to read a conv2d layer from the safetensors.
-fn create_conv2d(
-    tensors: &SafeTensors,
-    layer_name: &str,
-    use_cuda: bool,
-) -> Result<Box<dyn ForwardLayer>, anyhow::Error> {
-    let conv2d_options = functional::Conv2dOptions {
-        stride: (1, 1),
-        padding: (1, 1),
-        ..Default::default()
-    };
-    //
-    let weights = optional_cuda_to(
-        safetensor_to_tensor(tensors, &format!("{layer_name}.weight"))?,
-        use_cuda,
-    )?;
-    let bias = {
-        if let Ok(v) = safetensor_to_tensor(tensors, &format!("{layer_name}.bias")) {
-            Some(optional_cuda_to(v, use_cuda)?)
-        } else {
-            None
-        }
-    };
-    Ok(Box::new(LambdaForward::new(move |t: &Ten| {
-        let bias_ref = bias.as_ref();
-        let conv_res = functional::conv2d(t, &weights, bias_ref, &conv2d_options)?;
-        let res = functional::relu(&conv_res)?;
-
         Ok(res)
     })))
 }
@@ -322,6 +295,7 @@ pub fn main() -> Result<(), anyhow::Error> {
     let tensors = SafeTensors::deserialize(&data)?;
 
     let use_cuda = fp::torch::cuda::is_available();
+    let use_cuda = false;
     println!("cuda available? {use_cuda:?}");
 
     let vgg = VGG::new(&CFG_A, &tensors, use_cuda)?;
