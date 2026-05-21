@@ -59,6 +59,7 @@ const CFG_A: &[u32] = &[
     'M' as u32,
 ];
 
+#[derive(Debug)]
 /// VGG struct with layers and classifier.
 pub struct VGG {
     features: nn::Sequential,
@@ -82,7 +83,7 @@ impl VGG {
             }
         }
 
-        let our_safetensor = OurSafeTensors { st: tensors };
+        // let our_safetensor = OurSafeTensors { st: tensors };
 
         // Okay... so we iterate over cfg... build the layers and then append them to ourselves? How hard can it be.
         let mut layers: Vec<Box<dyn ForwardLayer>> = vec![];
@@ -106,9 +107,9 @@ impl VGG {
                     ..Default::default()
                 };
                 let mut layer = nn::Conv2d::new(in_channels, *v as usize, (3, 3), conv2d_options)?;
-                use nn::StateDictReader;
-                let ns = our_safetensor.namespaced(&layer_name);
-                layer.load_state_dict(&ns)?;
+                // use nn::StateDictReader;
+                // let ns = our_safetensor.namespaced(&layer_name);
+                // layer.load_state_dict(&ns)?;
                 in_channels = *v as usize;
                 layers.push(Box::new(layer));
                 layers.push(Box::new(nn::ReLU));
@@ -139,8 +140,13 @@ impl VGG {
         })
     }
 
-    pub fn forward(&self, input: &Tensor) -> Result<Tensor, anyhow::Error> {
-        let mut r: Tensor = input.clone();
+    pub fn to_cuda(&mut self) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
+}
+impl nn::Module for VGG {
+    fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
+        let mut r: Tensor = input.to_owned()?;
         // Run it through the layers.
         r = self.features.forward(&r.ten()?)?;
 
@@ -154,8 +160,11 @@ impl VGG {
 
         Ok(r)
     }
-
-    pub fn to_cuda(&mut self) -> Result<(), anyhow::Error> {
+    fn load_state_dict<'a>(&mut self, dict: &dyn nn::StateDictReader) -> Result<(), anyhow::Error> {
+        let features_ns = dict.namespaced("features");
+        self.features.load_state_dict(&features_ns)?;
+        let classifier_ns = dict.namespaced("classifier");
+        self.classifier.load_state_dict(&classifier_ns)?;
         Ok(())
     }
 }
@@ -297,8 +306,10 @@ pub fn main() -> Result<(), anyhow::Error> {
     let use_cuda = fp::torch::cuda::is_available();
     let use_cuda = false;
     println!("cuda available? {use_cuda:?}");
+    let our_safetensor = OurSafeTensors { st: &tensors };
 
-    let vgg = VGG::new(&CFG_A, &tensors, use_cuda)?;
+    let mut vgg = VGG::new(&CFG_A, &tensors, use_cuda)?;
+    vgg.load_state_dict(&our_safetensor)?;
 
     println!(
         "It's just label index output for now... use \
@@ -311,7 +322,7 @@ pub fn main() -> Result<(), anyhow::Error> {
 
         // println!("channels_stacked: {:?}", channels_stacked.shape());
         let r = vgg
-            .forward(&channels_stacked)?
+            .forward(&channels_stacked.ten()?)?
             .to(&flash_powder::factory::ToOptions {
                 device: Some(Device::from_str("cpu")?),
                 ..Default::default()
