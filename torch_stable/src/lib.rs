@@ -35,7 +35,6 @@ pub mod aoti_torch;
 pub mod contrib;
 pub mod headeronly;
 pub mod stable;
-mod support;
 pub mod util;
 
 pub use aoti_torch::{AOTI_TORCH_FAILURE, AOTI_TORCH_SUCCESS};

@@ -86,3 +86,14 @@ unsafe extern "C" {
     pub unsafe fn torch_exception_get_what_without_backtrace() -> *const c_char;
 
 }
+
+// https://github.com/pytorch/pytorch/pull/179421
+#[cfg(feature = "v2_13")]
+unsafe extern "C" {
+
+    pub unsafe fn torch_new_stable_ivalue(
+        allocated_value: *mut *mut StableIValue,
+    ) -> AOTITorchError;
+    pub unsafe fn torch_delete_stable_ivalue(value_to_delete: *mut StableIValue) -> AOTITorchError;
+
+}

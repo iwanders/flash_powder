@@ -2,12 +2,6 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    cc::Build::new()
-        .file("support/alloc_stableivalue.cpp")
-        .cpp(true)
-        .compile("iw_torch_stable");
-    println!("cargo::rerun-if-changed=support/alloc_stableivalue.cpp");
-
     if std::env::var("VIRTUAL_ENV").is_err() {
         eprintln!("Source a virtualenv!");
         std::process::exit(1);
@@ -38,12 +32,10 @@ fn main() {
     // Tell cargo to look for shared libraries in the specified directory
     let lib_path = lib_path.display();
     println!("cargo:rustc-link-search={lib_path}");
-    println!("cargo:rustc-link-lib=iw_torch_stable");
 
-    // Tell cargo to tell rustc to link the system bzip2
-    // shared library.
-    // println!("cargo:rustc-link-lib=torch");
-    //
+    // Why do we need this? :/ Without it we miss stuff like undefined reference: std::__throw_bad_alloc()
+    println!("cargo:rustc-link-lib=stdc++");
+
     let feature_cuda = std::env::var("CARGO_FEATURE_CUDA").is_ok();
     if feature_cuda {
         println!("cargo:rustc-link-arg=-Wl,--no-as-needed");

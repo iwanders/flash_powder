@@ -39,12 +39,12 @@ where
                 let converted: StableIValue = (*val).into();
                 let value_u64: u64 = converted.0;
                 {
-                    // TODO: Clean up when https://github.com/pytorch/pytorch/pull/179421
-                    // goes in.
-                    let raw_malloc_ptr_u64 =
-                        unsafe { crate::support::iw_stable_torch_alloc_stableivalue() };
-                    unsafe { *raw_malloc_ptr_u64 = value_u64 };
-                    let ptr_as_u64: u64 = raw_malloc_ptr_u64 as u64;
+                    // Hurray: https://github.com/pytorch/pytorch/pull/179421
+                    let mut ivalue_ptr = std::ptr::null_mut::<StableIValue>();
+                    unsafe_call_panic!(torch_new_stable_ivalue(&mut ivalue_ptr));
+
+                    unsafe { (*ivalue_ptr).0 = value_u64 };
+                    let ptr_as_u64: u64 = ivalue_ptr as u64;
                     StableIValue(ptr_as_u64)
                 }
             }
