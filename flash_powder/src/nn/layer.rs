@@ -1,4 +1,7 @@
-use super::{Module, StateDict, StateDictReader};
+//! Layers implementing [`Module`].
+//!
+//! These are prety much structs that wrap functions in [`crate::functional`] but also own the tensor weights.
+use super::module::{Module, StateDict, StateDictReader};
 use crate::factory::TensorOptions;
 use crate::functional;
 use crate::prelude::*;

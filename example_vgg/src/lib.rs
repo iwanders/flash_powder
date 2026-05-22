@@ -24,7 +24,8 @@ use flash_powder::functional;
 use flash_powder::nn;
 use flash_powder::prelude::*;
 use fp::{DType, Device, Ten, Tensor};
-use nn::Module;
+use nn::module::Module;
+use nn::module::{StateDictAdaptor, StateDictReader};
 
 // The config, as per https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L91
 // but then as integers.

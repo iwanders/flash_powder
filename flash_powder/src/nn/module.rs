@@ -1,3 +1,4 @@
+//! Traits for neural networks.
 use anyhow;
 use torch_stable::StableTorchResult;
 
@@ -161,7 +162,7 @@ impl<'a> StateDictAdaptor for NamespacedStateDictAdaptor<'a> {
 /// - Buffers; Tensor that do not record gradients, typically updated during forward step; `mean`, `variance` of BatchNorm.
 /// - Additionally state, not necessarily tensors, required for implementation or configuration of a Module.
 pub trait Module: std::fmt::Debug + AsAny {
-    fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error>;
+    fn forward(&self, input: &Ten<'_>) -> StableTorchResult<Tensor>;
     // These look relevant;
     // register_buffer
     // register_parameter
@@ -179,9 +180,11 @@ pub trait Module: std::fmt::Debug + AsAny {
     // __getstate__
     // state_dict
     // load_state_dict
+    /// Create a state dict that hold this layer's tensors.
     fn state_dict(&self) -> StableTorchResult<StateDict> {
         Ok(Default::default())
     }
+    /// Load a state dict into this layer.
     fn load_state_dict<'a>(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
         let _ = dict;
         Ok(())
