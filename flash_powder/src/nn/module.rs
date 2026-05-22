@@ -33,6 +33,7 @@ where
     }
 }
 
+/// Value enum for [`StateDict`].
 #[derive(Debug, Clone)]
 pub enum Data {
     /// Tensors that record gradients, typically weights.
@@ -42,15 +43,32 @@ pub enum Data {
     // State;  The non-tensor state :/
     // maybe a Box<dyn Any> ?
 }
+impl Data {
+    pub fn as_tensor(&self) -> StableTorchResult<&Tensor> {
+        match self {
+            Data::Parameter(tensor) => Ok(tensor),
+            Data::Buffer(tensor) => Ok(tensor),
+        }
+    }
+    pub fn as_tensor_mut(&mut self) -> StableTorchResult<&Tensor> {
+        match self {
+            Data::Parameter(tensor) => Ok(tensor),
+            Data::Buffer(tensor) => Ok(tensor),
+        }
+    }
+}
 
+/// A wrapper for the state dictionary.
 #[derive(Debug, Clone, Default)]
 pub struct StateDict {
     map: std::collections::HashMap<String, Data>,
 }
 impl StateDict {
+    /// Tensors that record gradients, typically weights.
     pub fn add_parameter(&mut self, name: &str, value: Tensor) -> StableTorchResult<()> {
         self.add_data(name, Data::Parameter(value))
     }
+    /// Tensors that record gradients, typically weights, only populating it if Some.
     pub fn add_optional_parameter(
         &mut self,
         name: &str,
@@ -62,6 +80,7 @@ impl StateDict {
             Ok(())
         }
     }
+    /// Tensors that do not record gradients, updated during forward step.
     pub fn add_buffer(&mut self, name: &str, value: Tensor) -> StableTorchResult<()> {
         self.add_data(name, Data::Buffer(value))
     }
@@ -85,6 +104,15 @@ impl StateDict {
     }
     pub fn as_map_mut(&mut self) -> &mut std::collections::HashMap<String, Data> {
         &mut self.map
+    }
+    pub fn into_namespaced(mut self, ns: &str) -> Self {
+        StateDict {
+            map: self
+                .map
+                .drain()
+                .map(|(k, v)| (format!("{ns}.{k}"), v))
+                .collect(),
+        }
     }
 }
 
@@ -175,18 +203,28 @@ pub trait Module: std::fmt::Debug + AsAny {
     // set_extra_state
     // apply
     // to
+    // fn to(&mut self, options: &crate::factory::ToOptions) -> StableTorchResult<()>;
     // __call__
     // __setstate__
     // __getstate__
+
     // state_dict
     // load_state_dict
     /// Create a state dict that hold this layer's tensors.
+    ///
+    /// Default implementation assumes that all tensors are weights.
     fn state_dict(&self) -> StableTorchResult<StateDict> {
-        Ok(Default::default())
+        let mut d = StateDict::default();
+        for (k, v) in self.tensors()? {
+            d.add_parameter(&k, v.clone())?;
+        }
+        Ok(d)
     }
     /// Load a state dict into this layer.
     fn load_state_dict<'a>(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
-        let _ = dict;
+        for (k, v) in self.tensors_mut()? {
+            *v = dict.tensor_required(&k)?;
+        }
         Ok(())
     }
 
@@ -195,6 +233,13 @@ pub trait Module: std::fmt::Debug + AsAny {
         Self: Sized + 'static,
     {
         Box::new(self)
+    }
+
+    fn tensors(&self) -> StableTorchResult<std::collections::HashMap<String, &Tensor>> {
+        Ok(Default::default())
+    }
+    fn tensors_mut(&mut self) -> StableTorchResult<std::collections::HashMap<String, &mut Tensor>> {
+        Ok(Default::default())
     }
 }
 
@@ -285,24 +330,24 @@ mod test {
         {
             let start: &mut Conv2d = seq_root.get_mut_as::<Conv2d>(0).unwrap();
             start.weight = zero.clone();
-            start.bias = None;
+            // start.bias = None;
         }
 
         let seq1 = seq_root.get_mut_as::<Sequential>(1).unwrap();
         let l1: &mut Linear = seq1.get_mut_as::<Linear>(0).unwrap();
         l1.weight = zero.clone();
-        l1.bias = None;
+        // l1.bias = None;
         let l2: &mut Linear = seq1.get_mut_as::<Linear>(1).unwrap();
         l2.weight = zero.clone();
-        l2.bias = None;
+        l2.bias = Some(zero.clone());
 
         let seq2 = seq_root.get_mut_as::<Sequential>(2).unwrap();
         let l2: &mut Linear = seq2.get_mut_as::<Linear>(0).unwrap();
         l2.weight = zero.clone();
-        l2.bias = None;
+        l2.bias = Some(zero.clone());
         let l3: &mut Linear = seq2.get_mut_as::<Linear>(1).unwrap();
         l3.weight = zero.clone();
-        l3.bias = None;
+        // l3.bias = None;
 
         // Now that should all be zero'd out.
         println!("root: {seq_root:?}");

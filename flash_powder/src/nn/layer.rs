@@ -40,6 +40,26 @@ impl Module for Sequential {
         }
         Ok(())
     }
+    /*
+     */
+    fn tensors(&self) -> StableTorchResult<std::collections::HashMap<String, &Tensor>> {
+        let mut res: std::collections::HashMap<String, &Tensor> = Default::default();
+        for (i, sublayer) in self.modules.iter().enumerate() {
+            for (ki, kv) in sublayer.tensors()? {
+                res.insert(format!("{i}.{ki}"), kv);
+            }
+        }
+        Ok(res)
+    }
+    fn tensors_mut(&mut self) -> StableTorchResult<std::collections::HashMap<String, &mut Tensor>> {
+        let mut res: std::collections::HashMap<String, &mut Tensor> = Default::default();
+        for (i, sublayer) in self.modules.iter_mut().enumerate() {
+            for (ki, kv) in sublayer.tensors_mut()? {
+                res.insert(format!("{i}.{ki}"), kv);
+            }
+        }
+        Ok(res)
+    }
 }
 impl Sequential {
     pub fn new() -> Self {
@@ -116,16 +136,28 @@ impl Module for Conv2d {
         let bias = self.bias.as_ref().map(|z| z.ten().unwrap());
         functional::conv2d(input, &self.weight.ten()?, bias.as_ref(), &self.options)
     }
-    fn state_dict(&self) -> StableTorchResult<StateDict> {
-        let mut m: StateDict = Default::default();
-        m.add_parameter("weight", self.weight.clone())?;
-        m.add_optional_parameter("bias", self.bias.clone())?;
-        Ok(m)
+
+    fn tensors(&self) -> StableTorchResult<std::collections::HashMap<String, &Tensor>> {
+        if let Some(bias_ref) = self.bias.as_ref() {
+            Ok([
+                ("weight".to_owned(), &self.weight),
+                ("bias".to_owned(), bias_ref),
+            ]
+            .into())
+        } else {
+            Ok([("weight".to_owned(), &self.weight)].into())
+        }
     }
-    fn load_state_dict(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
-        self.weight = dict.tensor_required("weight")?;
-        self.bias = dict.tensor("bias");
-        Ok(())
+    fn tensors_mut(&mut self) -> StableTorchResult<std::collections::HashMap<String, &mut Tensor>> {
+        if let Some(bias_ref) = self.bias.as_mut() {
+            Ok([
+                ("weight".to_owned(), &mut self.weight),
+                ("bias".to_owned(), bias_ref),
+            ]
+            .into())
+        } else {
+            Ok([("weight".to_owned(), &mut self.weight)].into())
+        }
     }
 }
 impl Conv2d {
@@ -195,16 +227,27 @@ impl Module for Linear {
         let bias = self.bias.as_ref().map(|z| z.ten().unwrap());
         functional::linear(input, &self.weight.ten()?, bias.as_ref())
     }
-    fn state_dict(&self) -> StableTorchResult<StateDict> {
-        let mut m: StateDict = Default::default();
-        m.add_parameter("weight", self.weight.clone())?;
-        m.add_optional_parameter("bias", self.bias.clone())?;
-        Ok(m)
+    fn tensors(&self) -> StableTorchResult<std::collections::HashMap<String, &Tensor>> {
+        if let Some(bias_ref) = self.bias.as_ref() {
+            Ok([
+                ("weight".to_owned(), &self.weight),
+                ("bias".to_owned(), bias_ref),
+            ]
+            .into())
+        } else {
+            Ok([("weight".to_owned(), &self.weight)].into())
+        }
     }
-    fn load_state_dict(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
-        self.weight = dict.tensor_required("weight")?;
-        self.bias = dict.tensor("bias");
-        Ok(())
+    fn tensors_mut(&mut self) -> StableTorchResult<std::collections::HashMap<String, &mut Tensor>> {
+        if let Some(bias_ref) = self.bias.as_mut() {
+            Ok([
+                ("weight".to_owned(), &mut self.weight),
+                ("bias".to_owned(), bias_ref),
+            ]
+            .into())
+        } else {
+            Ok([("weight".to_owned(), &mut self.weight)].into())
+        }
     }
 }
 impl Linear {
