@@ -210,19 +210,20 @@ pub trait Module: std::fmt::Debug + AsAny {
 
     // state_dict
     // load_state_dict
+
     /// Create a state dict that hold this layer's tensors.
     ///
     /// Default implementation assumes that all tensors are weights.
     fn state_dict(&self) -> StableTorchResult<StateDict> {
         let mut d = StateDict::default();
-        for (k, v) in self.tensors()? {
+        for (k, v) in self.tensors() {
             d.add_parameter(&k, v.clone())?;
         }
         Ok(d)
     }
     /// Load a state dict into this layer.
     fn load_state_dict<'a>(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
-        for (k, v) in self.tensors_mut()? {
+        for (k, v) in self.tensors_mut() {
             *v = dict.tensor_required(&k)?;
         }
         Ok(())
@@ -235,11 +236,18 @@ pub trait Module: std::fmt::Debug + AsAny {
         Box::new(self)
     }
 
-    fn tensors(&self) -> StableTorchResult<std::collections::HashMap<String, &Tensor>> {
-        Ok(Default::default())
+    /// Returns a map of references to this layer's tensors.
+    ///
+    /// If a weight, like a bias, is not populated, it should be skipped.
+    fn tensors(&self) -> std::collections::HashMap<String, &Tensor> {
+        Default::default()
     }
-    fn tensors_mut(&mut self) -> StableTorchResult<std::collections::HashMap<String, &mut Tensor>> {
-        Ok(Default::default())
+
+    /// Returns a map of mutable references to this layer's tensors.
+    ///
+    /// If a weight, like a bias, is not populated, it should be skipped.
+    fn tensors_mut(&mut self) -> std::collections::HashMap<String, &mut Tensor> {
+        Default::default()
     }
 }
 
