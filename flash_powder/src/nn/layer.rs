@@ -160,6 +160,61 @@ impl Conv2d {
     }
 }
 
+/// ConvTranspose2d
+///
+/// - pytorch equivalent; <https://docs.pytorch.org/docs/2.12/generated/torch.nn.ConvTranspose2d.html>
+#[derive(Debug, Clone)]
+pub struct ConvTranspose2d {
+    pub weight: Tensor,
+    pub bias: Option<Tensor>,
+    pub options: functional::ConvTranspose2dOptions,
+}
+impl Module for ConvTranspose2d {
+    fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
+        let bias = self.bias.as_ref().map(|z| z.ten().unwrap());
+        functional::conv_transpose2d(input, &self.weight.ten()?, bias.as_ref(), &self.options)
+    }
+
+    fn tensors(&self) -> ModuleTensors<'_> {
+        ModuleTensors::new()
+            .with("weight", &self.weight)
+            .with_optional("bias", &self.bias)
+    }
+    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_> {
+        ModuleTensorsMut::new()
+            .with("weight", &mut self.weight)
+            .with_optional("bias", &mut self.bias)
+    }
+}
+impl ConvTranspose2d {
+    /// A new conv2d layer, with bias.
+    pub fn new(
+        in_channels: usize,
+        out_channels: usize,
+        kernel_size: (i64, i64),
+        options: functional::ConvTranspose2dOptions,
+    ) -> StableTorchResult<Self> {
+        // Weights is; [out_channels, in_channels / groups, kernel_size[0], kernel_size[1]]
+        let channels_div_groups = ((in_channels as i64) / options.groups) as usize;
+        let weight = Tensor::zeros(
+            &[
+                out_channels,
+                channels_div_groups,
+                kernel_size.0 as usize,
+                kernel_size.1 as usize,
+            ],
+            &TensorOptions::default(),
+        )?;
+        // Bias is; [out_channels].
+        let bias = Tensor::zeros(&[out_channels], &TensorOptions::default())?;
+        Ok(Self {
+            weight,
+            bias: Some(bias),
+            options,
+        })
+    }
+}
+
 /// Relu
 ///
 /// - pytorch equivalent; <https://docs.pytorch.org/docs/2.12/generated/torch.nn.ReLU.html>
