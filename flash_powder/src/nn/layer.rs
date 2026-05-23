@@ -166,13 +166,6 @@ impl Module for ReLU {
     fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
         functional::relu(input)
     }
-    fn tensors(&self) -> ModuleTensors<'_> {
-        Default::default()
-    }
-
-    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_> {
-        Default::default()
-    }
 }
 
 /// Maxpool2D
@@ -186,13 +179,6 @@ pub struct MaxPool2d {
 impl Module for MaxPool2d {
     fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
         functional::max_pool2d(input, self.kernel_size, &self.options)
-    }
-    fn tensors(&self) -> ModuleTensors<'_> {
-        ModuleTensors::new()
-    }
-
-    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_> {
-        Default::default()
     }
 }
 
@@ -239,19 +225,14 @@ impl Linear {
     }
 }
 
+/// A placeholder identity operator
+///
+/// This can be very useful fo replace layers that do nothing in inference to keep the layer indices identical.
 #[derive(Debug, Clone)]
 pub struct Identity;
 
 impl Module for Identity {
     fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
         input.to_owned()
-    }
-
-    fn tensors(&self) -> ModuleTensors<'_> {
-        Default::default()
-    }
-
-    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_> {
-        Default::default()
     }
 }

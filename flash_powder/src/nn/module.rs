@@ -142,6 +142,7 @@ impl StateDictReader for StateDict {
     }
 }
 
+/// Trait that specifies the input for [`Module::load_state_dict`].
 pub trait StateDictReader: StateDictAdaptor {
     fn inner(&self) -> &dyn StateDictAdaptor;
 
@@ -224,6 +225,10 @@ impl<'a> ModuleTensors<'a> {
     pub fn drain(&mut self) -> impl Iterator<Item = (String, &'a Tensor)> {
         self.map.drain()
     }
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &&'a Tensor)> {
+        self.map.iter()
+    }
+
     pub fn extend<T: Iterator<Item = (String, &'a Tensor)>>(&mut self, t: T) {
         self.map.extend(t)
     }
@@ -276,6 +281,9 @@ impl<'a> ModuleTensorsMut<'a> {
     pub fn drain(&mut self) -> impl Iterator<Item = (String, &'a mut Tensor)> {
         self.map.drain()
     }
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &&'a mut Tensor)> {
+        self.map.iter()
+    }
     pub fn extend<T: Iterator<Item = (String, &'a mut Tensor)>>(&mut self, t: T) {
         self.map.extend(t)
     }
@@ -288,11 +296,51 @@ impl<'a> ModuleTensorsMut<'a> {
 /// - Python class code: <https://github.com/pytorch/pytorch/blob/v2.12.0/torch/nn/modules/module.py#L407>
 /// - C++ class code: <https://github.com/pytorch/pytorch/blob/v2.12.0/torch/csrc/api/include/torch/nn/module.h#L63>
 ///
+///
+/// An example of how this trait looks, for a real layer like Conv2D:
+///
+/// ```
+///  use flash_powder::{prelude::*, functional, Tensor, Ten};
+///  use flash_powder::nn::module::{Module, ModuleTensors, ModuleTensorsMut};
+///  #[derive(Debug, Clone)]
+///  pub struct Conv2d {
+///      pub weight: Tensor,
+///      pub bias: Option<Tensor>,
+///      pub options: functional::Conv2dOptions,
+///  }
+///  impl Module for Conv2d {
+///      fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
+///        let bias = self.bias.as_ref().map(|z| z.ten().unwrap());
+///        functional::conv2d(input, &self.weight.ten()?, bias.as_ref(), &self.options)
+///      }
+///
+///      fn tensors(&self) -> ModuleTensors<'_> {
+///        ModuleTensors::new()
+///           .with("weight", &self.weight)
+///           .with_optional("bias", &self.bias)
+///      }
+///      fn tensors_mut(&mut self) -> ModuleTensorsMut<'_> {
+///        ModuleTensorsMut::new()
+///           .with("weight", &mut self.weight)
+///           .with_optional("bias", &mut self.bias)
+///      }
+///  }
+/// ```
+///
 /// Three kinds of persistent data (from c++ docs):
 /// - Parameters; Tensors that record gradient, typically weights, like `weight` of linear.
 /// - Buffers; Tensor that do not record gradients, typically updated during forward step; `mean`, `variance` of BatchNorm.
 /// - Additionally state, not necessarily tensors, required for implementation or configuration of a Module.
+///
+/// <div class="warning">
+///
+/// If your layer has weights, don't forget to implement [`Module::tensors`] and [`Module::tensors_mut`] for the state dict
+/// loading and exporting to work correctly.
+///
+/// </div>
+///
 pub trait Module: std::fmt::Debug + AsAny {
+    /// Define the computation performed at every call.
     fn forward(&self, input: &Ten<'_>) -> StableTorchResult<Tensor>;
     // These look relevant;
     // register_buffer
@@ -306,6 +354,7 @@ pub trait Module: std::fmt::Debug + AsAny {
     // set_extra_state
     // apply
     // to
+    /// Calls [`to`][`crate::core_methods::CoreMethods::to`] on all tensors returned by [`tensors_mut`][`Module::tensors_mut`].
     fn to(&mut self, options: &crate::factory::ToOptions) -> StableTorchResult<()> {
         for (_k, v) in self.tensors_mut().drain() {
             *v = v.to(options)?;
@@ -346,13 +395,17 @@ pub trait Module: std::fmt::Debug + AsAny {
 
     /// Returns a map of references to this layer's tensors.
     ///
-    /// If a weight, like a bias, is not populated, it should be skipped.
-    fn tensors(&self) -> ModuleTensors<'_>;
+    /// Default implementation is an empty map, be sure to implement it if the layer has tensors.
+    fn tensors(&self) -> ModuleTensors<'_> {
+        Default::default()
+    }
 
     /// Returns a map of mutable references to this layer's tensors.
     ///
-    /// If a weight, like a bias, is not populated, it should be skipped.
-    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_>;
+    /// Default implementation is an empty map, be sure to implement it if the layer has tensors.
+    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_> {
+        Default::default()
+    }
 }
 
 // dyn_clone::clone_trait_object!(Module);

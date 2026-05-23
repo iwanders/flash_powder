@@ -13,22 +13,16 @@
 //! - [`core_methods`]`::`[`CoreMethodsMut`][`core_methods::CoreMethodsMut`]: Methods / Functions on [`TensorAccess`] that require mutable access.
 //! - [`functional`]: Holds free functions line [`conv2d`][`functional::conv2d`] and [`relu`][`functional::relu`], just like PyTorch's Functional.
 //!
-//!
 //! Other principles;
 //! - No unsafe in the public interface, safe behaviour as you'd expect.
 //! - No interior mutability, all methods are const correct.
 //! - Modifying one tensor will not modify another, unless through an mutable borrow.
 //! - Rust style lifetimes on tensors, either tied together with an explicit lifetime, or completely separate.
-
-/*
-
-Todo:
-    Forbid data access for non contiguous arrays.
-    Use slicing to get a view of the single value... then use data to retrieve the bytes in the storage.
-    Do not index into non contugous arrays ourselves, that's a footgun!
-    Maybe just forbid ata access to non contiguous at all.
-
-*/
+//!
+//! The [`nn`] module provides pure-Rust implementations for some of Pytorch's nn submodule;
+//! - [`nn::Module`]: Main trait for a neural network layer.
+//! - [`nn::layer`]: Implemented layers, these are nothing more than structs owning weights and calling into the appropriate [`functional`].
+//!
 
 pub mod torch;
 

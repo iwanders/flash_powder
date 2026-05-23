@@ -9,23 +9,14 @@
 // Smallest is vgg11;
 // https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L306-L329
 // which is of the 'A' category.
-//    weights = VGG11_Weights.verify(weights)
-// return _vgg("A", False, weights, progress, **kwargs)
-// https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L98
-// VGG(make_layers(cfgs[cfg], batch_norm=batch_norm), **kwargs)
-// batch norm = False
-// Layers per 'A'.
-// We're doing inference, we can skip the dropout.
 use anyhow::bail;
 use safetensors::SafeTensors;
 
 use flash_powder as fp;
-use flash_powder::functional;
-use flash_powder::nn;
-use flash_powder::prelude::*;
-use fp::{DType, Device, Ten, Tensor};
+use flash_powder::{Ten, Tensor, functional, nn, prelude::*};
 use nn::module::{Module, ModuleTensors, ModuleTensorsMut};
 
+// -------------- VGG Implementation --------------
 // The config, as per https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L91
 // but then as integers.
 const CFG_A: &[u32] = &[
@@ -41,33 +32,7 @@ pub struct VGG {
 }
 impl VGG {
     /// Create a new vgg config as per the layer specification and the provided weights.
-    pub fn new(cfg: &[u32]) -> Result<Self, anyhow::Error> {
-        // Okay... so we iterate over cfg... build the layers up.
-        let mut features: nn::Sequential = Default::default();
-        let mut in_channels = 3;
-        for v in cfg.iter() {
-            if *v == 'M' as u32 {
-                // 'M' denotes maxpool layer.
-                features.push(nn::MaxPool2d {
-                    kernel_size: (2, 2),
-                    options: Default::default(),
-                });
-            } else {
-                let conv2d_options = functional::Conv2dOptions {
-                    stride: (1, 1),
-                    padding: (1, 1),
-                    ..Default::default()
-                };
-                let layer = nn::Conv2d::new(in_channels, *v as usize, (3, 3), conv2d_options)?;
-                features.push(layer);
-                features.push(nn::ReLU);
-                in_channels = *v as usize;
-            }
-        }
-
-        // could also do:
-        // let features = layers.drain(..).collect();
-
+    pub fn new(features: nn::Sequential) -> Result<Self, anyhow::Error> {
         // https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L43
         // and then the group called classifier
         let mut classifier: nn::Sequential = Default::default();
@@ -89,29 +54,17 @@ impl VGG {
             classifier,
         })
     }
-
-    pub fn to_cuda(&mut self) -> Result<(), anyhow::Error> {
-        Ok(())
-    }
 }
 impl nn::Module for VGG {
     // https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L65
     fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
         let mut r = self.features.forward(input)?;
-        r = fp::functional::adaptive_avg_pool2d(&r, (7, 7))?;
+        r = functional::adaptive_avg_pool2d(&r, (7, 7))?;
         r = r.flatten(1, None)?;
         r = self.classifier.forward(&r.ten()?)?;
 
         Ok(r)
     }
-    /*
-    fn load_state_dict<'a>(&mut self, dict: &dyn nn::StateDictReader) -> Result<(), anyhow::Error> {
-        let features_ns = dict.namespaced("features");
-        self.features.load_state_dict(&features_ns)?;
-        let classifier_ns = dict.namespaced("classifier");
-        self.classifier.load_state_dict(&classifier_ns)?;
-        Ok(())
-    }*/
     fn tensors(&self) -> ModuleTensors<'_> {
         ModuleTensors::new()
             .with_namespaced("features", self.features.tensors())
@@ -125,30 +78,49 @@ impl nn::Module for VGG {
     }
 }
 
-fn optional_cuda_to(v: Tensor, use_cuda: bool) -> Result<Tensor, anyhow::Error> {
-    if use_cuda {
-        v.to(&Device::CUDA.into())
-    } else {
-        Ok(v)
+fn make_layers(cfg: &[u32]) -> Result<nn::Sequential, anyhow::Error> {
+    // https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L73
+    let mut features: nn::Sequential = Default::default();
+    let mut in_channels = 3;
+    for v in cfg.iter() {
+        if *v == 'M' as u32 {
+            // 'M' denotes maxpool layer.
+            features.push(nn::MaxPool2d {
+                kernel_size: (2, 2),
+                options: Default::default(),
+            });
+        } else {
+            let conv2d_options = functional::Conv2dOptions {
+                stride: (1, 1),
+                padding: (1, 1),
+                ..Default::default()
+            };
+            let layer = nn::Conv2d::new(in_channels, *v as usize, (3, 3), conv2d_options)?;
+            features.push(layer);
+            features.push(nn::ReLU);
+            in_channels = *v as usize;
+        }
     }
+    Ok(features)
 }
 
+// -------------- Safetensor interface to flash powder's state dict loading --------------
 /// Converter to go from safetnsors DType to flash_powder DType
-fn safetensor_dtype_to_scalar_type(v: safetensors::Dtype) -> DType {
+fn safetensor_dtype_to_scalar_type(v: safetensors::Dtype) -> fp::DType {
     match v {
-        safetensors::Dtype::F32 => DType::F32,
-        safetensors::Dtype::F64 => DType::F64,
+        safetensors::Dtype::F32 => fp::DType::F32,
+        safetensors::Dtype::F64 => fp::DType::F64,
         _ => todo!("todo handle {v:?}"),
     }
 }
 
 /// Convert a tensor by `name` from `tensors` into a flash powder Tensor.
-fn safetensor_to_tensor(tensors: &SafeTensors, name: &str) -> Result<Tensor, anyhow::Error> {
+fn safetensor_to_tensor(tensors: &SafeTensors, name: &str) -> Result<fp::Tensor, anyhow::Error> {
     if let Ok(tensor_view) = tensors.tensor(name) {
         // Create a tensor of the correct shape and type
-        let mut v = Tensor::zeros(
+        let mut v = fp::Tensor::zeros(
             tensor_view.shape(),
-            &flash_powder::factory::TensorOptions {
+            &fp::factory::TensorOptions {
                 dtype: Some(safetensor_dtype_to_scalar_type(tensor_view.dtype())),
                 ..Default::default()
             },
@@ -183,18 +155,19 @@ impl<'a, 'd> nn::StateDictReader for OurSafeTensors<'a, 'd> {
     }
 }
 
+// -------------- image::DynamicImage to fp::Tensor --------------
 /// Convert dynamic image into [1, 3, h, w] Tensor as floats.
 fn image_to_float_tensor(
     image: &image::DynamicImage,
     use_cuda: bool,
-) -> Result<Tensor, anyhow::Error> {
+) -> Result<fp::Tensor, anyhow::Error> {
     let img = image.to_rgb8();
 
     // Lets first just tensorify the image, first create an empty tensor.
-    let mut t = Tensor::zeros(
+    let mut t = fp::Tensor::zeros(
         &[img.height() as usize, img.width() as usize, 3],
-        &flash_powder::factory::TensorOptions {
-            dtype: Some(DType::U8),
+        &fp::factory::TensorOptions {
+            dtype: Some(fp::DType::U8),
             ..Default::default()
         },
     )?;
@@ -202,8 +175,8 @@ fn image_to_float_tensor(
     t.data_mut()?.copy_from_slice(img.as_raw().as_slice());
 
     // Convert that into a float tensor and multiply it by 255.0
-    let img_float = t.to(&flash_powder::factory::ToOptions {
-        dtype: Some(DType::F32),
+    let img_float = t.to(&fp::factory::ToOptions {
+        dtype: Some(fp::DType::F32),
         ..Default::default()
     })?;
     let divisor: Tensor = (255.0,).try_into()?;
@@ -214,12 +187,17 @@ fn image_to_float_tensor(
 
     let channels_stacked = img_tensor_ready.permute(&[2, 0, 1])?;
     let with_batch = channels_stacked.view(&[1, 3, h, w])?.to_owned()?;
-    let on_device = optional_cuda_to(with_batch, use_cuda)?;
-    Ok(on_device)
+    if use_cuda {
+        Ok(with_batch.to(&fp::Device::CUDA.into())?)
+    } else {
+        Ok(with_batch)
+    }
 }
 
 pub fn main() -> Result<(), anyhow::Error> {
     use std::path::PathBuf;
+
+    // Verify weights exist, if not give a nice warning.
     let weights = PathBuf::from("data/vgg11-8a719046.safetensors");
     if !weights.is_file() {
         eprintln!(
@@ -231,53 +209,44 @@ pub fn main() -> Result<(), anyhow::Error> {
         bail!("missing necessary file, bailing out")
     }
 
+    // Load safetensors and wrap
     let data = std::fs::read(weights).expect("Unable to read file");
-
     let tensors = SafeTensors::deserialize(&data)?;
-    const PRINT_TENSOR_SHAPES: bool = false;
-
-    if PRINT_TENSOR_SHAPES {
-        let mut sorted = tensors.names().clone();
-        sorted.sort();
-
-        for name in sorted {
-            println!("Tensor key: {}", name);
-
-            if let Ok(view) = tensors.tensor(name) {
-                println!("  Shape: {:?}", view.shape());
-            }
-        }
-    }
-
-    let use_cuda = fp::torch::cuda::is_available();
-    println!("cuda available? {use_cuda:?}");
     let our_safetensor = OurSafeTensors { st: &tensors };
 
-    let mut vgg = VGG::new(&CFG_A)?;
+    // Instantiate vgg network and load its weights.
+    let features = make_layers(&CFG_A)?;
+    let mut vgg = VGG::new(features)?;
     vgg.load_state_dict(&our_safetensor)?;
+
+    // Move to cuda if available.
+    let use_cuda = fp::torch::cuda::is_available();
+    println!("cuda available? {use_cuda:?}");
     if use_cuda {
-        vgg.to(&Device::CUDA.into())?
+        vgg.to(&fp::Device::CUDA.into())?
     }
 
+    // Print how to interpret the returned value.
     println!(
-        "It's just label index output for now... use \
+        "It's just (label index, value) output for now... use \
         https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/_meta.py#L7 to look them up"
     );
 
+    // Iterate over the input arguments and run the network.
     for argument in std::env::args().skip(1) {
         let img = image::ImageReader::open(&argument)?.decode()?;
         let channels_stacked = image_to_float_tensor(&img, use_cuda)?;
 
-        // println!("channels_stacked: {:?}", channels_stacked.shape());
         let r = vgg
             .forward(&channels_stacked.ten()?)?
             .to(&flash_powder::factory::ToOptions {
-                device: Some(Device::from_str("cpu")?),
+                device: Some(fp::Device::CPU),
                 ..Default::default()
             })?;
         // https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/_meta.py#L7
-        // Find the highest value, using some typical
+        const INDEX_TO_LINE_NUMBER: usize = 8;
 
+        // Find the highest value.
         let max_item = r
             .f32s_ref()?
             .iter()
@@ -286,7 +255,7 @@ pub fn main() -> Result<(), anyhow::Error> {
 
         println!(
             "{argument: >50}: max_item: {max_item: >10?}, which in _meta.py#L7 is line number: {}",
-            max_item.unwrap().0 + 8
+            max_item.unwrap().0 + INDEX_TO_LINE_NUMBER
         );
     }
 
