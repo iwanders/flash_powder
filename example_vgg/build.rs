@@ -1,3 +1,3 @@
 fn main() {
-    torch_stable::downtree_build_rs();
+    flash_powder::torch_stable::downtree_build_rs();
 }

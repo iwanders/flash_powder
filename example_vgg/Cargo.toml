@@ -14,4 +14,4 @@ anyhow = {workspace=true }
 safetensors = "0.7.0"
 image = {version="0.25.10", features=["jpeg"]}
 [build-dependencies]
-torch_stable = {workspace=true, features=["cuda",  "v2_13"]}
+flash_powder = {workspace=true, features=["cuda",  "v2_13"]}

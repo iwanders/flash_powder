@@ -274,7 +274,6 @@ dependencies = [
  "flash_powder",
  "image",
  "safetensors",
- "torch_stable",
 ]
 
 [[package]]

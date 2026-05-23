@@ -40,6 +40,13 @@ There's some support tooling in the contrib submodule, but it's mostly there for
 
 The functionality in this crate is a subset of the upstream functionality, it does not follow Rust lifetimes or safety guarantees.
 
+## Usage
+
+Run this to add the dependency to a cargo project.
+```
+cargo add --git https://github.com/iwanders/flash_powder.git flash_powder
+```
+
 ## Testing
 
 I want to ensure that the tensors & function arguments follow conventions from the Python side, so there's a heavy emphasis
