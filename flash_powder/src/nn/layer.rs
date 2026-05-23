@@ -52,13 +52,16 @@ impl Sequential {
     pub fn push_boxed(&mut self, m: Box<dyn Module>) {
         self.modules.push(m)
     }
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Box<dyn Module>> {
-        self.modules.get_mut(index)
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut dyn Module> {
+        if let Some(boxed_value) = self.modules.get_mut(index) {
+            Some(&mut (**boxed_value))
+        } else {
+            None
+        }
     }
     pub fn get_mut_as<T: Sized + 'static>(&mut self, index: usize) -> Option<&mut T> {
-        use std::ops::DerefMut;
         if let Some(v) = self.get_mut(index) {
-            v.deref_mut().as_any_mut().downcast_mut()
+            v.as_any_mut().downcast_mut()
         } else {
             None
         }
