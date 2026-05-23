@@ -1,7 +1,7 @@
 // https://github.com/pytorch/pytorch/blob/f2b47323ac2c438722c2db58aa31d9222676509d/torch/csrc/stable/device.h
 
 use super::c::torch_parse_device_string;
-use crate::{StableTorchResult, unsafe_call_bail};
+use crate::unsafe_call_bail;
 use anyhow::bail;
 
 pub use super::accelerator::DeviceIndex;
@@ -31,26 +31,6 @@ impl Device {
         }
     }
 
-    pub fn from_str(device_string: &str) -> StableTorchResult<Self> {
-        if device_string.is_empty() {
-            // This causes an assert under the hood.
-            bail!("device string may not be empty");
-        }
-        let as_cstr = CString::new(device_string).expect("CString::new failed");
-        let device_string = as_cstr.as_ptr();
-        let mut device_type = 0u32;
-        let mut device_index = 0i32;
-        unsafe_call_bail!(torch_parse_device_string(
-            device_string,
-            &mut device_type,
-            &mut device_index,
-        ));
-        Ok(Self {
-            device_type: device_type.try_into()?,
-            device_index: DeviceIndex(device_index),
-        })
-    }
-
     // Called 'type' on cpp.
     pub fn device_type(&self) -> DeviceType {
         self.device_type
@@ -69,21 +49,45 @@ impl Device {
     }
 }
 
+impl std::convert::TryFrom<&str> for Device {
+    type Error = anyhow::Error;
+
+    fn try_from(device_string: &str) -> Result<Self, Self::Error> {
+        if device_string.is_empty() {
+            // This causes an assert under the hood.
+            bail!("device string may not be empty");
+        }
+        let as_cstr = CString::new(device_string).expect("CString::new failed");
+        let device_string = as_cstr.as_ptr();
+        let mut device_type = 0u32;
+        let mut device_index = 0i32;
+        unsafe_call_bail!(torch_parse_device_string(
+            device_string,
+            &mut device_type,
+            &mut device_index,
+        ));
+        Ok(Self {
+            device_type: device_type.try_into()?,
+            device_index: DeviceIndex(device_index),
+        })
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     #[test]
     fn test_device_constructor() {
-        let cpu = Device::from_str("cpu").unwrap();
+        let cpu = Device::try_from("cpu").unwrap();
         assert_eq!(cpu.device_type(), DeviceType::CPU);
-        let cuda_dev = Device::from_str("cuda:0").unwrap();
+        let cuda_dev = Device::try_from("cuda:0").unwrap();
         assert_eq!(cuda_dev.device_type(), DeviceType::CUDA);
-        let cuda_dev = Device::from_str("cuda:1").unwrap();
+        let cuda_dev = Device::try_from("cuda:1").unwrap();
         assert_eq!(cuda_dev.device_type(), DeviceType::CUDA);
         assert_eq!(cuda_dev.device_index().0, 1);
 
         if crate::RUN_SPAMMY_TESTS {
-            let res = Device::from_str("definitely_not_a_valid_type:1");
+            let res = Device::try_from("definitely_not_a_valid_type:1");
             assert!(res.is_err());
             println!("res: {res:?}");
         }

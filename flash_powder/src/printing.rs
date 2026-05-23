@@ -87,23 +87,13 @@ impl ScalarPrintOptions {
     }
 }
 #[derive(Copy, Clone, Debug)]
+#[derive(Default)]
 pub struct TensorPrintOptions {
     pub print_options: PrintOptions,
     pub scalar_options: ScalarPrintOptions,
     pub element_width: Option<usize>,
     pub summarize: Option<bool>,
     pub indent: usize,
-}
-impl Default for TensorPrintOptions {
-    fn default() -> Self {
-        Self {
-            print_options: Default::default(),
-            scalar_options: Default::default(),
-            summarize: None,
-            indent: 0,
-            element_width: None,
-        }
-    }
 }
 
 // formatter's new method is experimental... so I can't create a formatter to just test my printoptions.
@@ -149,7 +139,7 @@ fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> S
         }
         m
     };
-    let mut options = options.clone();
+    let mut options = *options;
     let element_width = options.element_width.unwrap_or(determine_width(t));
     options.element_width = Some(element_width);
     // https://github.com/pytorch/pytorch/blob/8f8409cae86d725a75e2ac54ce8f93def107ced7/torch/_tensor_str.py#L242
@@ -224,10 +214,7 @@ fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> S
     };
 
     if t.dim() == 0 {
-        format!(
-            "{}",
-            format_scalar_tensor(&t.ten().unwrap(), &options.scalar_options).unwrap()
-        )
+        format_scalar_tensor(&t.ten().unwrap(), &options.scalar_options).unwrap().to_string()
     } else if t.dim() == 1 {
         let element_width = determine_width(t);
 
@@ -290,7 +277,7 @@ impl std::fmt::Debug for Ten<'_> {
 }
 
 pub fn data_to_string<T: PrintRequirements>(v: &T, options: &TensorPrintOptions) -> String {
-    tensor_format(v, &options)
+    tensor_format(v, options)
 }
 
 #[cfg(test)]

@@ -30,19 +30,11 @@ use torch_stable::{aoti_torch::*, unsafe_call_dispatch_panic};
 
 use torch_stable::headeronly::core::MemoryFormat;
 #[derive(Copy, Clone, Debug)]
+#[derive(Default)]
 pub struct MeanOptions {
     pub dim: Option<usize>,
     pub keepdim: bool,
     pub dtype: Option<DType>,
-}
-impl Default for MeanOptions {
-    fn default() -> Self {
-        Self {
-            dim: None,
-            keepdim: false,
-            dtype: None,
-        }
-    }
 }
 
 /// Core methods that require const access.

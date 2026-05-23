@@ -260,9 +260,9 @@ pub fn interpolate<T: TensorAccess + TensorProperties>(
     } else if options.size.is_some() {
         // We can't validate lengths here because our arrays are always fixed size.
         output_size = Some(&options.size.as_ref().unwrap()[0..dim]);
-    } else if options.scale_factor.is_some() {
+    } else if let Some(scale_factor) = options.scale_factor.as_ref() {
         // We can't validate lengths here because our arrays are always fixed size.
-        scale_factors = Some(&options.scale_factor.as_ref().unwrap()[0..dim]);
+        scale_factors = Some(&scale_factor[0..dim]);
     } else {
         bail!("one of size or scale_factor must be defined");
     }

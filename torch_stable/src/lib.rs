@@ -54,7 +54,7 @@ include!(concat!(env!("OUT_DIR"), "/generated_consts.rs"));
 
 /// Helper function that downtree users can call from their `build.rs` file:
 ///
-/// ```
+/// ```rust,ignore
 /// fn main() {
 ///    torch_stable::downtree_build_rs();
 /// }

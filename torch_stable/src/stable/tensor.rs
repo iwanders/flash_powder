@@ -22,6 +22,10 @@ impl Drop for TensorDropper {
         unsafe_call_panic!(aoti_torch_delete_tensor_object(self.0));
     }
 }
+// This should be safe I think? The handle should be fully safe to move around between threads and also for concurrent
+// access.
+unsafe impl Send for TensorDropper {}
+unsafe impl Sync for TensorDropper {}
 
 #[derive(Clone)]
 pub struct Tensor {

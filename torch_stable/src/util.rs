@@ -39,6 +39,7 @@ pub fn get_exception_what() -> String {
 #[macro_export]
 macro_rules! unsafe_call_bail {
     ($($tokens:tt)*) => {{
+        #[allow(clippy::macro_metavars_in_unsafe)]
         let api_call_result = unsafe {$($tokens)*};
         let code_text = stringify!($($tokens)*);
         if api_call_result == $crate::AOTI_TORCH_FAILURE {
@@ -54,6 +55,7 @@ macro_rules! unsafe_call_bail {
 #[macro_export]
 macro_rules! unsafe_call_panic {
     ($($tokens:tt)*) => {{
+        #[allow(clippy::macro_metavars_in_unsafe)]
         let api_call_result = unsafe {$($tokens)*};
         let code_text = stringify!($($tokens)*);
         if api_call_result == $crate::AOTI_TORCH_FAILURE {
@@ -86,12 +88,12 @@ macro_rules! unsafe_call_dispatch_bail {
 
         let overload_name = std::ffi::CString::new($overload_name).expect("CString::new failed");
         let overload_name_cstr = overload_name.as_ptr();
-
+        let local_stack_ptr = $stack.as_mut_ptr();
         let api_call_result = unsafe {
             $crate::stable::c::torch_call_dispatcher(
                 op_name_cstr,
                 overload_name_cstr,
-                $stack.as_mut_ptr(),
+                local_stack_ptr,
                 $crate::TORCH_ABI_VERSION,
             )
         };

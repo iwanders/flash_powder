@@ -52,18 +52,19 @@ pub enum TensorIndexOptions<'a> {
         stride: isize,
     },
 }
-impl<'a> Into<TensorIndexOptions<'a>> for isize {
-    fn into(self) -> TensorIndexOptions<'a> {
-        TensorIndexOptions::Index(self)
+impl<'a> From<isize> for TensorIndexOptions<'a> {
+    fn from(val: isize) -> Self {
+        TensorIndexOptions::Index(val)
     }
 }
-impl<'a> Into<TensorIndexOptions<'a>> for std::ops::Range<isize> {
-    fn into(self) -> TensorIndexOptions<'a> {
-        TensorIndexOptions::Range(self.clone())
+impl<'a> From<std::ops::Range<isize>> for TensorIndexOptions<'a> {
+    fn from(val: std::ops::Range<isize>) -> Self {
+        TensorIndexOptions::Range(val.clone())
     }
 }
-impl<'a> Into<TensorIndexOptions<'a>> for std::ops::RangeFull {
-    fn into(self) -> TensorIndexOptions<'a> {
+impl<'a> From<std::ops::RangeFull> for TensorIndexOptions<'a> {
+    fn from(val: std::ops::RangeFull) -> Self {
+        let _ = val;
         TensorIndexOptions::RangeFull
     }
 }
@@ -134,7 +135,7 @@ where
     }
 }
 
-impl<'a, 'd, A: Clone, B: Clone, T: TensorIndexWorker> IndexSpec<T> for (A, B)
+impl<'a, A: Clone, B: Clone, T: TensorIndexWorker> IndexSpec<T> for (A, B)
 where
     A: Into<TensorIndexOptions<'a>>,
     B: Into<TensorIndexOptions<'a>>,
@@ -225,7 +226,7 @@ where
     }
 }
 
-impl<'a, 'd, A: Clone, B: Clone, T: TensorIndexWorkerMut> IndexSpecMut<T> for (A, B)
+impl<'a, A: Clone, B: Clone, T: TensorIndexWorkerMut> IndexSpecMut<T> for (A, B)
 where
     A: Into<TensorIndexOptions<'a>>,
     B: Into<TensorIndexOptions<'a>>,

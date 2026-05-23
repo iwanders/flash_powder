@@ -57,12 +57,11 @@ fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let dest_path = std::path::Path::new(&out_dir).join("generated_consts.rs");
     let mut lines = String::new();
-    lines += &format!(
-        "/// This constant holds the library directory according to torch_stable's compilation.\n"
-    );
+    lines +=
+        "/// This constant holds the library directory according to torch_stable's compilation.\n";
     lines += &format!("pub const LIB_PATH: &str = \"{lib_path}\";\n");
 
-    lines += &format!("/// This holds torch_stable's 'cuda' feature flag.\n");
+    lines += "/// This holds torch_stable's 'cuda' feature flag.\n";
     lines += &format!("pub const FEATURE_CUDA: bool = {feature_cuda};\n");
     std::fs::write(&dest_path, lines).unwrap();
 }

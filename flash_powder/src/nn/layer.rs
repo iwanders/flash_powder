@@ -17,7 +17,7 @@ pub struct Sequential {
 impl Module for Sequential {
     fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
         if self.modules.is_empty() {
-            return Ok(input.to_owned()?);
+            return input.to_owned();
         }
         let mut intermediate = self.modules.first().unwrap().forward(input)?;
         for remaining_layers in self.modules.iter().skip(1) {
@@ -185,8 +185,6 @@ impl Module for MaxPool2d {
 /// Linear
 ///
 /// - pytorch equivalent; <https://docs.pytorch.org/docs/2.12/generated/torch.nn.Linear.html>
-
-/// Helper to read a linear layer from the safetensors.
 #[derive(Debug, Clone)]
 pub struct Linear {
     pub weight: Tensor,

@@ -249,7 +249,7 @@ mod test {
         assert_eq!(t.get_device_index(), DeviceIndex(-1));
         assert_eq!(t.defined(), true);
         assert_eq!(t.scalar_type(), ScalarType::Float);
-        assert_eq!(t.device(), Device::from_str("cpu").unwrap());
+        assert_eq!(t.device(), Device::try_from("cpu").unwrap());
         assert_eq!(t.to_f32().unwrap(), std::f32::consts::PI);
 
         // and double
@@ -341,7 +341,7 @@ mod test {
 
         // This definitely shares storage;
         let b = t.to(&ToOptions {
-            device: Some(Device::from_str("cpu")?),
+            device: Some(Device::try_from("cpu")?),
             //device: Some(Device::from_str("cuda:0")?),
             copy: false,
             ..Default::default()

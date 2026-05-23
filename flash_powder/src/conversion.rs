@@ -65,7 +65,7 @@ impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy> TryInto<Tenso
                 ..Default::default()
             },
         )?;
-        v.ds_mut::<T>()?.copy_from_slice(&self);
+        v.ds_mut::<T>()?.copy_from_slice(self);
         Ok(v)
     }
 }
@@ -119,7 +119,7 @@ impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const C: usiz
                 ..Default::default()
             },
         )?;
-        v.data_mut()?.copy_from_slice(&self.as_bytes());
+        v.data_mut()?.copy_from_slice(self.as_bytes());
         Ok(v)
     }
 }
@@ -137,7 +137,7 @@ impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const C: usiz
                 ..Default::default()
             },
         )?;
-        v.data_mut()?.copy_from_slice(&self.as_bytes());
+        v.data_mut()?.copy_from_slice(self.as_bytes());
         Ok(v)
     }
 }
@@ -159,7 +159,7 @@ impl<
                 ..Default::default()
             },
         )?;
-        v.data_mut()?.copy_from_slice(&self.as_bytes());
+        v.data_mut()?.copy_from_slice(self.as_bytes());
         Ok(v)
     }
 }
@@ -181,7 +181,7 @@ impl<
                 ..Default::default()
             },
         )?;
-        v.data_mut()?.copy_from_slice(&self.as_bytes());
+        v.data_mut()?.copy_from_slice(self.as_bytes());
         Ok(v)
     }
 }

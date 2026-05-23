@@ -1,9 +1,10 @@
-/// Quickly thrown together example of VGG11
-///
-/// `https://docs.pytorch.org/vision/main/models/generated/torchvision.models.vgg11.html#torchvision.models.vgg11`
-/// Code:
-/// `https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L91`.
-///
+//! Quickly thrown together example of VGG11
+//!
+//! `https://docs.pytorch.org/vision/main/models/generated/torchvision.models.vgg11.html#torchvision.models.vgg11`
+//! Code:
+//! `https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L91`.
+//!
+//
 // https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py
 
 // Smallest is vgg11;
@@ -215,7 +216,7 @@ pub fn main() -> Result<(), anyhow::Error> {
     let our_safetensor = OurSafeTensors { st: &tensors };
 
     // Instantiate vgg network and load its weights.
-    let features = make_layers(&CFG_A)?;
+    let features = make_layers(CFG_A)?;
     let mut vgg = VGG::new(features)?;
     vgg.load_state_dict(&our_safetensor)?;
 

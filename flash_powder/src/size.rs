@@ -2,14 +2,13 @@
 //!
 //! Why do we need this? Well because .sizes() -> &[usize], which is not owned.
 //! This also means that calling sizes() borrows the tensor, this makes it impossible to call a mutable method.
-//! In short;
+//! In short, the following will not compile:
 //! ```ignore
 //! # use flash_powder::prelude::*;
 //! # use flash_powder::Tensor;
 //! let mut t = Tensor::randn(&[3,3], &Default::default()).unwrap();
-//! let v = t.view_mut(t.sizes());
+//! let v = t.view_mut(t.sizes()); // Mutable method while a non-mutable borrow exists (t.sizes())
 //! ```
-//! is a compilation error.
 //!
 //! We avoid this with;
 //! ```rust
@@ -22,26 +21,24 @@
 //!
 //! This is the rough equivalent to `torch.Size`.
 //!
-//! It can deref into `&[usize]`!.
+//! It can deref into `&[usize]`!
 
 #[derive(Default, Clone, Debug)]
 pub struct Size(tinyvec::TinyVec<[usize; 8]>);
 
 impl Size {
     pub fn from(v: &[usize]) -> Size {
-        let mut z = Size::default();
-        z.0 = v.iter().copied().collect();
-        z
+        Size(v.iter().copied().collect())
     }
 }
 
 impl std::ops::Deref for Size {
     type Target = [usize];
     fn deref(&self) -> &Self::Target {
-        &self.0.as_slice()
+        self.0.as_slice()
     }
 }
-impl<'a> PartialEq<&[usize]> for &Size {
+impl PartialEq<&[usize]> for &Size {
     fn eq(&self, other: &&[usize]) -> bool {
         self.0.as_slice() == *other
     }

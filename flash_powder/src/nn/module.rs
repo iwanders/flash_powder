@@ -197,7 +197,7 @@ impl<'a> ModuleTensors<'a> {
         }
     }
     pub fn insert_namespaced(&mut self, k: &str, tensors: ModuleTensors<'a>) {
-        self.extend(&mut tensors.into_namespaced(&k).drain())
+        self.extend(&mut tensors.into_namespaced(k).drain())
     }
 
     pub fn with<T: Into<String>>(mut self, k: T, tensor: &'a Tensor) -> Self {
@@ -209,7 +209,7 @@ impl<'a> ModuleTensors<'a> {
         self
     }
     pub fn with_namespaced(mut self, k: &str, tensors: ModuleTensors<'a>) -> Self {
-        self.extend(&mut tensors.into_namespaced(&k).drain());
+        self.extend(&mut tensors.into_namespaced(k).drain());
         self
     }
 
@@ -253,7 +253,7 @@ impl<'a> ModuleTensorsMut<'a> {
         }
     }
     pub fn insert_namespaced(&mut self, k: &str, tensors: ModuleTensorsMut<'a>) {
-        self.extend(&mut tensors.into_namespaced(&k).drain())
+        self.extend(&mut tensors.into_namespaced(k).drain())
     }
 
     pub fn with<T: Into<String>>(mut self, k: T, tensor: &'a mut Tensor) -> Self {
@@ -265,7 +265,7 @@ impl<'a> ModuleTensorsMut<'a> {
         self
     }
     pub fn with_namespaced(mut self, k: &str, tensors: ModuleTensorsMut<'a>) -> Self {
-        self.extend(&mut tensors.into_namespaced(&k).drain());
+        self.extend(&mut tensors.into_namespaced(k).drain());
         self
     }
 
@@ -379,14 +379,14 @@ pub trait Module: std::fmt::Debug + AsAny {
         Ok(d)
     }
     /// Load a state dict into this layer.
-    fn load_state_dict<'a>(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
+    fn load_state_dict(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
         for (k, v) in self.tensors_mut().drain() {
             *v = dict.tensor_required(&k)?;
         }
         Ok(())
     }
 
-    fn into_boxed(self: Self) -> Box<dyn Module>
+    fn into_boxed(self) -> Box<dyn Module>
     where
         Self: Sized + 'static,
     {
