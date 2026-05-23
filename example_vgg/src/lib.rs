@@ -24,8 +24,7 @@ use flash_powder::functional;
 use flash_powder::nn;
 use flash_powder::prelude::*;
 use fp::{DType, Device, Ten, Tensor};
-use nn::module::Module;
-use nn::module::{StateDictAdaptor, StateDictReader};
+use nn::module::{Module, ModuleTensors, ModuleTensorsMut};
 
 // The config, as per https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/vgg.py#L91
 // but then as integers.
@@ -105,12 +104,24 @@ impl nn::Module for VGG {
 
         Ok(r)
     }
+    /*
     fn load_state_dict<'a>(&mut self, dict: &dyn nn::StateDictReader) -> Result<(), anyhow::Error> {
         let features_ns = dict.namespaced("features");
         self.features.load_state_dict(&features_ns)?;
         let classifier_ns = dict.namespaced("classifier");
         self.classifier.load_state_dict(&classifier_ns)?;
         Ok(())
+    }*/
+    fn tensors(&self) -> ModuleTensors<'_> {
+        ModuleTensors::new()
+            .with_namespaced("features", self.features.tensors())
+            .with_namespaced("classifier", self.classifier.tensors())
+    }
+
+    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_> {
+        ModuleTensorsMut::new()
+            .with_namespaced("features", self.features.tensors_mut())
+            .with_namespaced("classifier", self.classifier.tensors_mut())
     }
 }
 
@@ -239,12 +250,14 @@ pub fn main() -> Result<(), anyhow::Error> {
     }
 
     let use_cuda = fp::torch::cuda::is_available();
-    let use_cuda = false;
     println!("cuda available? {use_cuda:?}");
     let our_safetensor = OurSafeTensors { st: &tensors };
 
     let mut vgg = VGG::new(&CFG_A)?;
     vgg.load_state_dict(&our_safetensor)?;
+    if use_cuda {
+        vgg.to(&Device::CUDA.into())?
+    }
 
     println!(
         "It's just label index output for now... use \

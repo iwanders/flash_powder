@@ -2,7 +2,7 @@
 use anyhow;
 use torch_stable::StableTorchResult;
 
-use crate::{Ten, Tensor};
+use crate::{Ten, Tensor, core_methods::CoreMethods as _};
 
 // from https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=f0cee315491dc3c3b6b3f467d6a3b072
 // Provide a custom trait so that we can write a blanket implementation.
@@ -178,6 +178,109 @@ impl<'a> StateDictAdaptor for NamespacedStateDictAdaptor<'a> {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct ModuleTensors<'a> {
+    map: std::collections::HashMap<String, &'a Tensor>,
+}
+impl<'a> ModuleTensors<'a> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+    pub fn insert<T: Into<String>>(&mut self, k: T, tensor: &'a Tensor) {
+        let _ = self.map.insert(k.into(), tensor);
+    }
+
+    pub fn insert_optional<T: Into<String>>(&mut self, k: T, tensor: &'a Option<Tensor>) {
+        if let Some(tensor) = tensor {
+            let _ = self.map.insert(k.into(), tensor);
+        }
+    }
+    pub fn insert_namespaced(&mut self, k: &str, tensors: ModuleTensors<'a>) {
+        self.extend(&mut tensors.into_namespaced(&k).drain())
+    }
+
+    pub fn with<T: Into<String>>(mut self, k: T, tensor: &'a Tensor) -> Self {
+        self.insert(k, tensor);
+        self
+    }
+    pub fn with_optional<T: Into<String>>(mut self, k: T, tensor: &'a Option<Tensor>) -> Self {
+        self.insert_optional(k, tensor);
+        self
+    }
+    pub fn with_namespaced(mut self, k: &str, tensors: ModuleTensors<'a>) -> Self {
+        self.extend(&mut tensors.into_namespaced(&k).drain());
+        self
+    }
+
+    pub fn into_namespaced(mut self, ns: &str) -> Self {
+        Self {
+            map: self
+                .map
+                .drain()
+                .map(|(k, v)| (format!("{ns}.{k}"), v))
+                .collect(),
+        }
+    }
+    pub fn drain(&mut self) -> impl Iterator<Item = (String, &'a Tensor)> {
+        self.map.drain()
+    }
+    pub fn extend<T: Iterator<Item = (String, &'a Tensor)>>(&mut self, t: T) {
+        self.map.extend(t)
+    }
+}
+
+// And the exact same with Mut :/
+#[derive(Debug, Default)]
+pub struct ModuleTensorsMut<'a> {
+    map: std::collections::HashMap<String, &'a mut Tensor>,
+}
+impl<'a> ModuleTensorsMut<'a> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+    pub fn insert<T: Into<String>>(&mut self, k: T, tensor: &'a mut Tensor) {
+        let _ = self.map.insert(k.into(), tensor);
+    }
+
+    pub fn insert_optional<T: Into<String>>(&mut self, k: T, tensor: &'a mut Option<Tensor>) {
+        if let Some(tensor) = tensor {
+            let _ = self.map.insert(k.into(), tensor);
+        }
+    }
+    pub fn insert_namespaced(&mut self, k: &str, tensors: ModuleTensorsMut<'a>) {
+        self.extend(&mut tensors.into_namespaced(&k).drain())
+    }
+
+    pub fn with<T: Into<String>>(mut self, k: T, tensor: &'a mut Tensor) -> Self {
+        self.insert(k, tensor);
+        self
+    }
+    pub fn with_optional<T: Into<String>>(mut self, k: T, tensor: &'a mut Option<Tensor>) -> Self {
+        self.insert_optional(k, tensor);
+        self
+    }
+    pub fn with_namespaced(mut self, k: &str, tensors: ModuleTensorsMut<'a>) -> Self {
+        self.extend(&mut tensors.into_namespaced(&k).drain());
+        self
+    }
+
+    pub fn into_namespaced(mut self, ns: &str) -> Self {
+        Self {
+            map: self
+                .map
+                .drain()
+                .map(|(k, v)| (format!("{ns}.{k}"), v))
+                .collect(),
+        }
+    }
+    pub fn drain(&mut self) -> impl Iterator<Item = (String, &'a mut Tensor)> {
+        self.map.drain()
+    }
+    pub fn extend<T: Iterator<Item = (String, &'a mut Tensor)>>(&mut self, t: T) {
+        self.map.extend(t)
+    }
+}
+
 /// Base trait for all neural network modules.
 ///
 /// - Pytorch Docs: <https://docs.pytorch.org/docs/2.12/generated/torch.nn.Module.html>
@@ -203,7 +306,12 @@ pub trait Module: std::fmt::Debug + AsAny {
     // set_extra_state
     // apply
     // to
-    // fn to(&mut self, options: &crate::factory::ToOptions) -> StableTorchResult<()>;
+    fn to(&mut self, options: &crate::factory::ToOptions) -> StableTorchResult<()> {
+        for (_k, v) in self.tensors_mut().drain() {
+            *v = v.to(options)?;
+        }
+        Ok(())
+    }
     // __call__
     // __setstate__
     // __getstate__
@@ -216,14 +324,14 @@ pub trait Module: std::fmt::Debug + AsAny {
     /// Default implementation assumes that all tensors are weights.
     fn state_dict(&self) -> StableTorchResult<StateDict> {
         let mut d = StateDict::default();
-        for (k, v) in self.tensors() {
+        for (k, v) in self.tensors().drain() {
             d.add_parameter(&k, v.clone())?;
         }
         Ok(d)
     }
     /// Load a state dict into this layer.
     fn load_state_dict<'a>(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
-        for (k, v) in self.tensors_mut() {
+        for (k, v) in self.tensors_mut().drain() {
             *v = dict.tensor_required(&k)?;
         }
         Ok(())
@@ -239,16 +347,12 @@ pub trait Module: std::fmt::Debug + AsAny {
     /// Returns a map of references to this layer's tensors.
     ///
     /// If a weight, like a bias, is not populated, it should be skipped.
-    fn tensors(&self) -> std::collections::HashMap<String, &Tensor> {
-        Default::default()
-    }
+    fn tensors(&self) -> ModuleTensors<'_>;
 
     /// Returns a map of mutable references to this layer's tensors.
     ///
     /// If a weight, like a bias, is not populated, it should be skipped.
-    fn tensors_mut(&mut self) -> std::collections::HashMap<String, &mut Tensor> {
-        Default::default()
-    }
+    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_>;
 }
 
 // dyn_clone::clone_trait_object!(Module);

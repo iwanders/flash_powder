@@ -1,7 +1,7 @@
 //! Layers implementing [`Module`].
 //!
 //! These are prety much structs that wrap functions in [`crate::functional`] but also own the tensor weights.
-use super::module::{Module, StateDict, StateDictReader};
+use super::module::{Module, ModuleTensors, ModuleTensorsMut};
 use crate::factory::TensorOptions;
 use crate::functional;
 use crate::prelude::*;
@@ -26,21 +26,17 @@ impl Module for Sequential {
         Ok(intermediate)
     }
 
-    fn tensors(&self) -> std::collections::HashMap<String, &Tensor> {
-        let mut res: std::collections::HashMap<String, &Tensor> = Default::default();
+    fn tensors(&self) -> ModuleTensors<'_> {
+        let mut res: ModuleTensors = Default::default();
         for (i, sublayer) in self.modules.iter().enumerate() {
-            for (ki, kv) in sublayer.tensors() {
-                res.insert(format!("{i}.{ki}"), kv);
-            }
+            res.insert_namespaced(&format!("{i}"), sublayer.tensors())
         }
         res
     }
-    fn tensors_mut(&mut self) -> std::collections::HashMap<String, &mut Tensor> {
-        let mut res: std::collections::HashMap<String, &mut Tensor> = Default::default();
+    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_> {
+        let mut res: ModuleTensorsMut = Default::default();
         for (i, sublayer) in self.modules.iter_mut().enumerate() {
-            for (ki, kv) in sublayer.tensors_mut() {
-                res.insert(format!("{i}.{ki}"), kv);
-            }
+            res.insert_namespaced(&format!("{i}"), sublayer.tensors_mut())
         }
         res
     }
@@ -121,27 +117,15 @@ impl Module for Conv2d {
         functional::conv2d(input, &self.weight.ten()?, bias.as_ref(), &self.options)
     }
 
-    fn tensors(&self) -> std::collections::HashMap<String, &Tensor> {
-        if let Some(bias_ref) = self.bias.as_ref() {
-            [
-                ("weight".to_owned(), &self.weight),
-                ("bias".to_owned(), bias_ref),
-            ]
-            .into()
-        } else {
-            [("weight".to_owned(), &self.weight)].into()
-        }
+    fn tensors(&self) -> ModuleTensors<'_> {
+        ModuleTensors::new()
+            .with("weight", &self.weight)
+            .with_optional("bias", &self.bias)
     }
-    fn tensors_mut(&mut self) -> std::collections::HashMap<String, &mut Tensor> {
-        if let Some(bias_ref) = self.bias.as_mut() {
-            [
-                ("weight".to_owned(), &mut self.weight),
-                ("bias".to_owned(), bias_ref),
-            ]
-            .into()
-        } else {
-            [("weight".to_owned(), &mut self.weight)].into()
-        }
+    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_> {
+        ModuleTensorsMut::new()
+            .with("weight", &mut self.weight)
+            .with_optional("bias", &mut self.bias)
     }
 }
 impl Conv2d {
@@ -182,6 +166,13 @@ impl Module for ReLU {
     fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
         functional::relu(input)
     }
+    fn tensors(&self) -> ModuleTensors<'_> {
+        Default::default()
+    }
+
+    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_> {
+        Default::default()
+    }
 }
 
 /// Maxpool2D
@@ -195,6 +186,13 @@ pub struct MaxPool2d {
 impl Module for MaxPool2d {
     fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
         functional::max_pool2d(input, self.kernel_size, &self.options)
+    }
+    fn tensors(&self) -> ModuleTensors<'_> {
+        ModuleTensors::new()
+    }
+
+    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_> {
+        Default::default()
     }
 }
 
@@ -213,27 +211,15 @@ impl Module for Linear {
         let bias = self.bias.as_ref().map(|z| z.ten().unwrap());
         functional::linear(input, &self.weight.ten()?, bias.as_ref())
     }
-    fn tensors(&self) -> std::collections::HashMap<String, &Tensor> {
-        if let Some(bias_ref) = self.bias.as_ref() {
-            [
-                ("weight".to_owned(), &self.weight),
-                ("bias".to_owned(), bias_ref),
-            ]
-            .into()
-        } else {
-            [("weight".to_owned(), &self.weight)].into()
-        }
+    fn tensors(&self) -> ModuleTensors<'_> {
+        ModuleTensors::new()
+            .with("weight", &self.weight)
+            .with_optional("bias", &self.bias)
     }
-    fn tensors_mut(&mut self) -> std::collections::HashMap<String, &mut Tensor> {
-        if let Some(bias_ref) = self.bias.as_mut() {
-            [
-                ("weight".to_owned(), &mut self.weight),
-                ("bias".to_owned(), bias_ref),
-            ]
-            .into()
-        } else {
-            [("weight".to_owned(), &mut self.weight)].into()
-        }
+    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_> {
+        ModuleTensorsMut::new()
+            .with("weight", &mut self.weight)
+            .with_optional("bias", &mut self.bias)
     }
 }
 impl Linear {
@@ -259,5 +245,13 @@ pub struct Identity;
 impl Module for Identity {
     fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
         input.to_owned()
+    }
+
+    fn tensors(&self) -> ModuleTensors<'_> {
+        Default::default()
+    }
+
+    fn tensors_mut(&mut self) -> ModuleTensorsMut<'_> {
+        Default::default()
     }
 }
