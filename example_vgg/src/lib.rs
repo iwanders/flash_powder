@@ -180,7 +180,7 @@ fn image_to_float_tensor(
         dtype: Some(fp::DType::F32),
         ..Default::default()
     })?;
-    let divisor: Tensor = (255.0,).try_into()?;
+    let divisor: Tensor = 255.0.try_into()?;
     let img_tensor_ready = img_float.div(&divisor)?;
 
     let w = img_tensor_ready.shape()[1];

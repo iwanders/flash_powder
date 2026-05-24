@@ -11,7 +11,7 @@
 //! # use flash_powder::{StableTorchResult, Tensor};
 //! # fn foo() -> StableTorchResult<()>{
 //!
-//!   let d: Tensor = (5i64,).try_into()?;
+//!   let d: Tensor = 5i64.try_into()?;
 //!   assert_eq!(d.dim(), 0);
 //!   assert_eq!(d.i64_ref(&[])?, &5);
 //!
@@ -29,6 +29,24 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//!
+//! <div class="warning">
+//!
+//! Be aware that in Python, the default type is f32;
+//! ```python
+//!   d = torch.tensor(5.5)
+//!   assert d.dtype == torch.float32
+//! ```
+//!
+//! Doing the same in `flash_powder` results in an `f64`:
+//! ```rust
+//!   # use flash_powder::{Tensor, DType, prelude::*};
+//!   let d: Tensor = 5.5.try_into().unwrap();
+//!   assert_eq!(d.dtype(), DType::F64);
+//! ```
+//!
+//! </div>
 //!
 
 use crate::factory::TensorFactory;
@@ -70,22 +88,6 @@ impl_scalar_conversion!(i8);
 impl_scalar_conversion!(i16);
 impl_scalar_conversion!(i32);
 impl_scalar_conversion!(i64);
-
-impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy> TryInto<Tensor> for (T,) {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<Tensor, Self::Error> {
-        let mut v = Tensor::empty(
-            &[],
-            &EmptyOptions {
-                dtype: Some(T::type_dtype()),
-                ..Default::default()
-            },
-        )?;
-        v.ds_mut::<T>()?[0] = self.0;
-        Ok(v)
-    }
-}
 
 impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy> TryInto<Tensor> for &[T] {
     type Error = anyhow::Error;
@@ -139,11 +141,8 @@ impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const V: usiz
     }
 }
 
-impl<
-        T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
-        const C: usize,
-        const R: usize,
-    > TryInto<Tensor> for [[T; C]; R]
+impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const C: usize, const R: usize>
+    TryInto<Tensor> for [[T; C]; R]
 {
     type Error = anyhow::Error;
 
@@ -160,11 +159,8 @@ impl<
     }
 }
 // and its ref;
-impl<
-        T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
-        const C: usize,
-        const R: usize,
-    > TryInto<Tensor> for &[[T; C]; R]
+impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const C: usize, const R: usize>
+    TryInto<Tensor> for &[[T; C]; R]
 {
     type Error = anyhow::Error;
 
@@ -182,11 +178,11 @@ impl<
 }
 
 impl<
-        T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
-        const C: usize,
-        const R: usize,
-        const D: usize,
-    > TryInto<Tensor> for [[[T; C]; R]; D]
+    T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
+    const C: usize,
+    const R: usize,
+    const D: usize,
+> TryInto<Tensor> for [[[T; C]; R]; D]
 {
     type Error = anyhow::Error;
 
@@ -204,11 +200,11 @@ impl<
 }
 // and its ref;
 impl<
-        T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
-        const C: usize,
-        const R: usize,
-        const D: usize,
-    > TryInto<Tensor> for &[[[T; C]; R]; D]
+    T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
+    const C: usize,
+    const R: usize,
+    const D: usize,
+> TryInto<Tensor> for &[[[T; C]; R]; D]
 {
     type Error = anyhow::Error;
 
@@ -228,10 +224,10 @@ impl<
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::StableTorchResult;
     use crate::data::DataRef;
     use crate::dtype::DType;
     use crate::properties::TensorProperties;
-    use crate::StableTorchResult;
 
     #[test]
     fn test_tensor_try_from() -> StableTorchResult<()> {
@@ -301,7 +297,9 @@ mod test {
         assert_eq!(d.sizes(), &[2, 3]); // #PYTHON list(d.shape)
         assert_eq!(
             d.data()?,
-            &[0, 0, 160, 64, 0, 0, 64, 64, 0, 0, 160, 64, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 0, 0]
+            &[
+                0, 0, 160, 64, 0, 0, 64, 64, 0, 0, 160, 64, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 0, 0
+            ]
         ); // #PYTHON d.view(torch.uint8).view(-1).tolist()
         assert_eq!(d.dtype(), DType::F32); // #PYTHON d.dtype
 
@@ -313,7 +311,9 @@ mod test {
         assert_eq!(d.sizes(), &[3, 2]); // #PYTHON list(d.shape)
         assert_eq!(
             d.data()?,
-            &[0, 0, 160, 64, 0, 0, 64, 64, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 128, 63, 0, 0, 0, 64]
+            &[
+                0, 0, 160, 64, 0, 0, 64, 64, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 128, 63, 0, 0, 0, 64
+            ]
         ); // #PYTHON d.view(torch.uint8).view(-1).tolist()
         assert_eq!(d.dtype(), DType::F32); // #PYTHON d.dtype
 
@@ -338,16 +338,6 @@ mod test {
             #|PYTHON
             d = torch.tensor(int(5))
         */
-        let d: Tensor = (5i64,).try_into()?;
-        assert_eq!(d.dim(), 0); // #PYTHON d.dim()
-        assert_eq!(d.i64_ref(&[])?, &5); // #PYTHON d.item()
-        assert_eq!(d.dtype(), DType::I64); // #PYTHON d.dtype
-        assert_eq!(d.dtype(), DType::I64); // #PYTHON d.dtype
-
-        /*
-            #|PYTHON
-            d = torch.tensor(int(5))
-        */
         let d: Tensor = 5i64.try_into()?;
         assert_eq!(d.dim(), 0); // #PYTHON d.dim()
         assert_eq!(d.i64_ref(&[])?, &5); // #PYTHON d.item()
@@ -356,8 +346,9 @@ mod test {
         /*
             #|PYTHON
             d = torch.tensor(5.5)
+            assert d.dtype == torch.float32
         */
-        let d: Tensor = 5.5.try_into()?;
+        let d: Tensor = 5.5f32.try_into()?;
         assert_eq!(d.dim(), 0); // #PYTHON d.dim()
         assert_eq!(d.f32_ref(&[])?, &5.5); // #PYTHON d.item()
         assert_eq!(d.dtype(), DType::F32); // #PYTHON d.dtype
@@ -368,7 +359,7 @@ mod test {
         */
         let d: Tensor = 5.5f64.try_into()?;
         assert_eq!(d.dim(), 0); // #PYTHON d.dim()
-        assert_eq!(d.f32_ref(&[])?, &5.5); // #PYTHON d.item()
+        assert_eq!(d.f64_ref(&[])?, &5.5); // #PYTHON d.item()
         assert_eq!(d.dtype(), DType::F64); // #PYTHON d.dtype
 
         Ok(())

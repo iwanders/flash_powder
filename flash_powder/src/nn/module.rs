@@ -419,9 +419,9 @@ mod test {
     #[test]
     fn test_flash_powder_state_dict() -> StableTorchResult<()> {
         let mut s = StateDict::default();
-        let one: Tensor = (1.0,).try_into()?;
-        let two: Tensor = (2.0,).try_into()?;
-        let three: Tensor = (3.0,).try_into()?;
+        let one: Tensor = 1.0.try_into()?;
+        let two: Tensor = 2.0.try_into()?;
+        let three: Tensor = 3.0.try_into()?;
         s.add_buffer("foo", one.clone())?;
         assert_eq!(s.add_buffer("foo", one.clone()).is_err(), true);
         s.add_buffer("foo.bar", two.clone())?;
@@ -442,11 +442,11 @@ mod test {
 
     #[test]
     fn test_flash_powder_save_load() -> StableTorchResult<()> {
-        let zero: Tensor = (0.0,).try_into()?;
-        let one: Tensor = (1.0,).try_into()?;
-        let two: Tensor = (2.0,).try_into()?;
-        let three: Tensor = (3.0,).try_into()?;
-        let four: Tensor = (4.0,).try_into()?;
+        let zero: Tensor = 0.0.try_into()?;
+        let one: Tensor = 1.0.try_into()?;
+        let two: Tensor = 2.0.try_into()?;
+        let three: Tensor = 3.0.try_into()?;
+        let four: Tensor = 4.0.try_into()?;
 
         let linear1 = Linear {
             weight: one,

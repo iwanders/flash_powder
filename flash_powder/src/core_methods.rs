@@ -790,7 +790,7 @@ mod test {
         */
 
         let t = Tensor::from(&[0.3810f32, 1.2774, -0.2972, -0.3719, 0.4637])?;
-        let denom: Tensor = (0.5f32,).try_into()?;
+        let denom: Tensor = 0.5.try_into()?;
         let r = t.div(&denom)?;
         assert_eq!(r.sizes(), &[5]); // #PYTHON list(r.shape)
         assert_eq!(
@@ -817,7 +817,7 @@ mod test {
         */
 
         let t = Tensor::from(&[0.2015f32, -0.4255, 2.6087])?;
-        let factor: Tensor = (100.0f32,).try_into()?;
+        let factor: Tensor = 100.0.try_into()?;
         let r = t.mul(&factor)?;
         assert_eq!(r.sizes(), &[3]); // #PYTHON list(r.shape)
         assert_eq!(
