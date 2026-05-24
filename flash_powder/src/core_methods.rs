@@ -366,6 +366,18 @@ pub trait CoreMethodsMut: TensorAccess + TensorProperties {
         assert_eq!(self.data_ptr(), r.data_ptr());
         Ok(TenMut::new(self.get_tensor_mut(), r))
     }
+
+    /// Copies the elements from src into self tensor and returns self.
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L1808)
+    /// - [tensor method](https://docs.pytorch.org/docs/2.12/generated/torch.Tensor.copy_.html)
+    fn copy_<T: TensorAccess>(&mut self, t: &T) -> StableTorchResult<()> {
+        let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), t.get_tensor().into()];
+        unsafe_call_dispatch_bail!("aten::copy_", "", stack.as_mut_slice());
+        let r: StableTensor = stack[0].try_into()?;
+        assert_eq!(self.data_ptr(), r.data_ptr());
+        Ok(())
+    }
 }
 impl CoreMethodsMut for Tensor {}
 impl<'a> CoreMethodsMut for Ten<'a> {}
@@ -910,6 +922,29 @@ mod test {
 
         let y3 = x.squeeze_dim(1)?;
         assert_eq!(y3.sizes(), &[2, 2, 1, 2]); // #PYTHON list(y3.shape)
+
+        Ok(())
+    }
+    #[test]
+    fn test_flash_powder_copy_() -> StableTorchResult<()> {
+        // https://docs.pytorch.org/docs/2.12/generated/torch.squeeze.html#torch.squeeze
+        /*
+            #|PYTHON
+            x = torch.tensor([1.0, 2.0, 3.0])
+            x2 = torch.tensor([0.0, 1.0, 0.0])
+        */
+
+        let mut x: Tensor = [1.0, 2.0, 3.0].try_into()?;
+        assert_eq!(x.f64s_ref()?, &[1.0, 2.0, 3.0]); // #PYTHON x.tolist()
+        let x2: Tensor = [0.0, 1.0, 0.0].try_into()?;
+        assert_eq!(x2.f64s_ref()?, &[0.0, 1.0, 0.0]); // #PYTHON x2.tolist()
+
+        /*
+            #|PYTHON
+            x.copy_(x2)
+        */
+        x.copy_(&x2)?;
+        assert_eq!(x.f64s_ref()?, &[0.0, 1.0, 0.0]); // #PYTHON x.tolist()
 
         Ok(())
     }
