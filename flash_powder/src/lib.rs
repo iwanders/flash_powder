@@ -73,7 +73,7 @@ pub mod prelude {
     // pub use tensor::{Ten, TenMut, Tensor, TensorAccess};
 
     #[doc(inline)]
-    pub use index::TensorIndex;
+    pub use index::{TensorIndex, TensorIndexMut};
 
     // #[doc(inline)]
     // pub use super::torch;
