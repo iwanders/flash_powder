@@ -221,6 +221,30 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         Ok(Ten::new(self.get_tensor(), r))
     }
 
+    /// Squeeze
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L5856)
+    /// - [tensor method](https://docs.pytorch.org/docs/2.12/generated/torch.Tensor.squeeze.html)
+    /// - [pytorch method](https://docs.pytorch.org/docs/2.12/generated/torch.squeeze.html#torch.squeeze)
+    fn squeeze(&self) -> StableTorchResult<Ten<'_>> {
+        let mut stack: [StableIValue; 1] = [(self.get_tensor()).into()];
+        unsafe_call_dispatch_bail!("aten::squeeze", "", stack.as_mut_slice());
+        let r: StableTensor = stack[0].try_into()?;
+        assert_eq!(self.data_ptr(), r.data_ptr());
+        Ok(Ten::new(self.get_tensor(), r))
+    }
+    /// Squeeze
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L5856)
+    /// - [tensor method](https://docs.pytorch.org/docs/2.12/generated/torch.Tensor.squeeze.html)
+    /// - [pytorch method](https://docs.pytorch.org/docs/2.12/generated/torch.squeeze.html#torch.squeeze)
+    fn squeeze_dim(&self, dim: isize) -> StableTorchResult<Ten<'_>> {
+        let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), dim.into()];
+        unsafe_call_dispatch_bail!("aten::squeeze", "dim", stack.as_mut_slice());
+        let r: StableTensor = stack[0].try_into()?;
+        assert_eq!(self.data_ptr(), r.data_ptr());
+        Ok(Ten::new(self.get_tensor(), r))
+    }
     /// Argmax
     ///
     /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L836)
@@ -860,6 +884,32 @@ mod test {
         let y2 = x.argmax(Some(1), None)?;
         assert_eq!(y2.sizes(), &[4]); // #PYTHON list(y2.shape)
         assert_eq!(y2.i64s_ref()?, &[0, 2, 0, 1]); // #PYTHON y2.tolist()
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_squeeze() -> StableTorchResult<()> {
+        // https://docs.pytorch.org/docs/2.12/generated/torch.squeeze.html#torch.squeeze
+        /*
+            #|PYTHON
+            x = torch.zeros(2, 1, 2, 1, 2)
+            y1 = torch.squeeze(x)
+            y2 = torch.squeeze(x, 0)
+            y3 = torch.squeeze(x, 1)
+            #y3 = torch.squeeze(x, (1,2,3))
+        */
+
+        let x: Tensor = Tensor::zeros(&[2, 1, 2, 1, 2], &Default::default())?;
+        assert_eq!(x.sizes(), &[2, 1, 2, 1, 2]); // #PYTHON list(x.shape)
+        let y1 = x.squeeze()?;
+        assert_eq!(y1.sizes(), &[2, 2, 2]); // #PYTHON list(y1.shape)
+
+        let y2 = x.squeeze_dim(0)?;
+        assert_eq!(y2.sizes(), &[2, 1, 2, 1, 2]); // #PYTHON list(y2.shape)
+
+        let y3 = x.squeeze_dim(1)?;
+        assert_eq!(y3.sizes(), &[2, 2, 1, 2]); // #PYTHON list(y3.shape)
 
         Ok(())
     }
