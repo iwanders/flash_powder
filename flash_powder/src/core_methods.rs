@@ -288,6 +288,14 @@ impl<'a> Ten<'a> {
 
         Ok(Ten::new(self.as_parent(), r))
     }
+
+    pub fn into_squeeze(self) -> StableTorchResult<Ten<'a>> {
+        let mut stack: [StableIValue; 1] = [(self.get_tensor()).into()];
+        unsafe_call_dispatch_bail!("aten::squeeze", "", stack.as_mut_slice());
+        let r: StableTensor = stack[0].try_into()?;
+        assert_eq!(self.data_ptr(), r.data_ptr());
+        Ok(Ten::new(self.as_parent(), r))
+    }
 }
 
 /// Core methods that require mutable access.

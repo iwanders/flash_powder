@@ -52,6 +52,22 @@ pub enum TensorIndexOptions<'a> {
         stride: isize,
     },
 }
+impl<'a> std::fmt::Debug for TensorIndexOptions<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Tensor(_arg0) => f.debug_tuple("Tensor").finish(), //.field(arg0)
+            Self::Index(arg0) => f.debug_tuple("Index").field(arg0).finish(),
+            Self::Range(arg0) => f.debug_tuple("Range").field(arg0).finish(),
+            Self::RangeFull => write!(f, "RangeFull"),
+            Self::RangeWithStride { range, stride } => f
+                .debug_struct("RangeWithStride")
+                .field("range", range)
+                .field("stride", stride)
+                .finish(),
+        }
+    }
+}
+
 impl<'a> From<isize> for TensorIndexOptions<'a> {
     fn from(val: isize) -> Self {
         TensorIndexOptions::Index(val)
@@ -75,34 +91,50 @@ trait TensorIndexWorker: CoreMethods {
         index: &[&TensorIndexOptions<'a>],
     ) -> StableTorchResult<Ten<'b>> {
         // Make a view into the tensor, we'll be updating this as we go through the indexing operations.
+        let shape = self.shape();
         let mut current = self.ten()?;
-        let mut dim = 0;
+        let mut current_dim = 0;
+        let mut source_dim = 0;
+        const DEBUG: bool = false;
         for index_op_conv in index.iter() {
-            let mut do_dim_add = true;
+            if DEBUG {
+                println!(
+                    "current_dim {current_dim:?},  source_dim {source_dim:?}: Index op {index_op_conv:?}"
+                );
+            }
             match index_op_conv {
                 TensorIndexOptions::Tensor(_tensor) => todo!(),
                 TensorIndexOptions::Index(index) => {
-                    current = current.select(dim, *index as usize)?;
-                    do_dim_add = false;
+                    if DEBUG {
+                        println!("Before select shape: {:?}", current.shape());
+                    }
+                    current = current.select(current_dim, *index as usize)?;
+                    // current = current.narrow(current_dim, *index, 1)?.into_squeeze()?;
+                    if DEBUG {
+                        println!("After select shape: {:?}", current.shape());
+                    }
+                    //current_dim += 1;
+                    source_dim += 1;
                 }
                 TensorIndexOptions::Range(range) => {
                     let length = if range.start < 0 {
-                        (self.sizes()[dim] as isize + range.start) as usize + 1
+                        (shape[current_dim] as isize + range.start) as usize + 1
                     } else {
                         range.len()
                     };
-                    current = current.narrow(dim, range.start, length)?;
+                    current = current.narrow(current_dim, range.start, length)?;
+                    current_dim += 1;
+                    source_dim += 1;
                 }
                 TensorIndexOptions::RangeFull => {
-                    current = current.narrow(dim, 0, self.size(dim))?;
+                    current = current.narrow(current_dim, 0, shape[source_dim])?;
+                    current_dim += 1;
+                    source_dim += 1;
                 }
                 TensorIndexOptions::RangeWithStride {
                     range: _range,
                     stride: _stride,
                 } => todo!(),
-            }
-            if do_dim_add {
-                dim += 1;
             }
         }
         Ok(current)
@@ -169,33 +201,48 @@ trait TensorIndexWorkerMut: CoreMethodsMut + CoreMethods {
         // Make a view into the tensor, we'll be updating this as we go through the indexing operations.
         let shape = self.shape();
         let mut current = self.ten_mut()?;
-        let mut dim = 0;
+        let mut current_dim = 0;
+        let mut source_dim = 0;
+        const DEBUG: bool = false;
         for index_op_conv in index.iter() {
-            let mut do_dim_add = true;
+            if DEBUG {
+                println!(
+                    "current_dim {current_dim:?},  source_dim {source_dim:?}: Index op {index_op_conv:?}"
+                );
+            }
             match index_op_conv {
                 TensorIndexOptions::Tensor(_tensor) => todo!(),
                 TensorIndexOptions::Index(index) => {
-                    current = current.select_mut(dim, *index as usize)?;
-                    do_dim_add = false;
+                    if DEBUG {
+                        println!("Before select shape: {:?}", current.shape());
+                    }
+                    current = current.select_mut(current_dim, *index as usize)?;
+                    // current = current.narrow(current_dim, *index, 1)?.into_squeeze()?;
+                    if DEBUG {
+                        println!("After select shape: {:?}", current.shape());
+                    }
+                    //current_dim += 1;
+                    source_dim += 1;
                 }
                 TensorIndexOptions::Range(range) => {
                     let length = if range.start < 0 {
-                        (shape[dim] as isize + range.start) as usize + 1
+                        (shape[current_dim] as isize + range.start) as usize + 1
                     } else {
                         range.len()
                     };
-                    current = current.narrow_mut(dim, range.start, length)?;
+                    current = current.narrow_mut(current_dim, range.start, length)?;
+                    current_dim += 1;
+                    source_dim += 1;
                 }
                 TensorIndexOptions::RangeFull => {
-                    current = current.narrow_mut(dim, 0, shape[dim])?;
+                    current = current.narrow_mut(current_dim, 0, shape[source_dim])?;
+                    current_dim += 1;
+                    source_dim += 1;
                 }
                 TensorIndexOptions::RangeWithStride {
                     range: _range,
                     stride: _stride,
                 } => todo!(),
-            }
-            if do_dim_add {
-                dim += 1;
             }
         }
         Ok(current)
@@ -424,6 +471,45 @@ mod test {
         assert_eq!(offbyone.is_contiguous(), true);
         assert_eq!(offbyone.dim(), 0);
         println!("storage offset: {:?}", offbyone.storage_offset());
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_indexing_why_no_dimension_drop() -> StableTorchResult<()> {
+        // Simpler case of below is the actual problem.
+        /*
+            #|PYTHON
+            c = torch.zeros((2, 896))
+
+        */
+        let d = Tensor::zeros(&[2, 896], &Default::default())?;
+        assert_eq!(d.sizes(), &[2, 896]); // #PYTHON list(c.shape)
+
+        /*
+            #|PYTHON
+            u = c[0, :]
+
+        */
+        let u = d.i((0, ..))?;
+        assert_eq!(u.sizes(), &[896]); // #PYTHON list(u.shape)
+
+        //  if r: [2, 896, 1664], why doesn't r.i((0, .., ..)) make that [1, 896, 1664]?
+        /*
+            #|PYTHON
+            d = torch.zeros((2, 896, 1664))
+
+        */
+        let d = Tensor::zeros(&[2, 896, 1664], &Default::default())?;
+        assert_eq!(d.sizes(), &[2, 896, 1664]); // #PYTHON list(d.shape)
+
+        /*
+            #|PYTHON
+            v= d[0, :, :]
+
+        */
+        let v = d.i((0, .., ..))?;
+        assert_eq!(v.sizes(), &[896, 1664]); // #PYTHON list(v.shape)
+
         Ok(())
     }
 }

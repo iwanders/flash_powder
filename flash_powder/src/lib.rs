@@ -27,9 +27,9 @@
 /*
 
 Todo;
-    - if r: [2, 896, 1664], why doesn't r.i((0, .., ..)) make that [1, 896, 1664]?
     - Printing is excruciatingly slow (even for Size([1, 896, 1664])), unusable for Size([1, 64, 448, 832])
-    - Figure out how do we want to do overloads??? SHould it take input arguments? Example is squeeze_dim https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L5856
+    - Figure out how do we want to do overloads??? SHould it take input arguments?
+        Example is squeeze_dim; https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L5856
  */
 
 pub mod torch;
