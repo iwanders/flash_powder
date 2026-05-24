@@ -42,9 +42,15 @@ The functionality in this crate is a subset of the upstream functionality, it do
 
 ## Usage
 
-Run this to add the dependency to a cargo project.
+Run this to add the dependency to a cargo project in both `build-dependencies` and `dependencies`;
 ```
-cargo add --git https://github.com/iwanders/flash_powder.git flash_powder
+cargo add --git https://github.com/iwanders/flash_powder.git flash_powder  -F v2_13,cuda
+cargo add --git https://github.com/iwanders/flash_powder.git flash_powder  -F v2_13,cuda --build
+```
+
+Update with
+```
+cargo update
 ```
 
 ## Testing

@@ -29,8 +29,7 @@ use torch_stable::{
 use torch_stable::{aoti_torch::*, unsafe_call_dispatch_panic};
 
 use torch_stable::headeronly::core::MemoryFormat;
-#[derive(Copy, Clone, Debug)]
-#[derive(Default)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct MeanOptions {
     pub dim: Option<usize>,
     pub keepdim: bool,
@@ -204,6 +203,19 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     fn permute(&self, dims: &[usize]) -> StableTorchResult<Ten<'_>> {
         let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), dims.into()];
         unsafe_call_dispatch_bail!("aten::permute", "", stack.as_mut_slice());
+        let r: StableTensor = stack[0].try_into()?;
+        assert_eq!(self.data_ptr(), r.data_ptr());
+        Ok(Ten::new(self.get_tensor(), r))
+    }
+
+    /// Unsqueeze
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L6658)
+    /// - [tensor method](https://docs.pytorch.org/docs/2.11/generated/torch.Tensor.unsqueeze.html)
+    /// - [pytorch method](https://docs.pytorch.org/docs/2.11/generated/torch.unsqueeze.html#torch.unsqueeze)
+    fn unsqueeze(&self, dim: isize) -> StableTorchResult<Ten<'_>> {
+        let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), dim.into()];
+        unsafe_call_dispatch_bail!("aten::unsqueeze", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         assert_eq!(self.data_ptr(), r.data_ptr());
         Ok(Ten::new(self.get_tensor(), r))
@@ -785,6 +797,25 @@ mod test {
 
         // *z.f32_mut(&[3, 1, 2])? = 3.30;
         // assert_eq!(x.f32_ref(&[2, 3, 1])?, &3.30);
+
+        Ok(())
+    }
+    #[test]
+    fn test_flash_powder_unsqueeze() -> StableTorchResult<()> {
+        // https://docs.pytorch.org/docs/2.11/generated/torch.unsqueeze.html#torch.unsqueeze
+        /*
+            #|PYTHON
+            x = torch.tensor([1,2,3,4])
+            y1 = torch.unsqueeze(x, 0)
+            y2 = torch.unsqueeze(x, 1)
+        */
+
+        let x: Tensor = [1, 2, 3, 4].try_into()?;
+        assert_eq!(x.sizes(), &[4]); // #PYTHON list(x.shape)
+        let y1 = x.unsqueeze(0)?;
+        assert_eq!(y1.sizes(), &[1, 4]); // #PYTHON list(y1.shape)
+        let y2 = x.unsqueeze(1)?;
+        assert_eq!(y2.sizes(), &[4, 1]); // #PYTHON list(y2.shape)
 
         Ok(())
     }
