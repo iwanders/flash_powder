@@ -220,6 +220,20 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         assert_eq!(self.data_ptr(), r.data_ptr());
         Ok(Ten::new(self.get_tensor(), r))
     }
+
+    /// Argmax
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L836)
+    /// - [tensor method](https://docs.pytorch.org/docs/2.12/generated/torch.Tensor.argmax.html)
+    /// - [pytorch method](https://docs.pytorch.org/docs/2.12/generated/torch.argmax.html#torch.argmax)
+    fn argmax(&self, dim: Option<isize>, keepdim: Option<bool>) -> StableTorchResult<Tensor> {
+        let keepdim = keepdim.unwrap_or(false);
+        let mut stack: [StableIValue; 3] =
+            [(self.get_tensor()).into(), (&dim).into(), keepdim.into()];
+        unsafe_call_dispatch_bail!("aten::argmax", "", stack.as_mut_slice());
+        let r: StableTensor = stack[0].try_into()?;
+        Ok(Tensor::new(r))
+    }
 }
 impl CoreMethods for Tensor {}
 impl<'a> CoreMethods for Ten<'a> {}
@@ -816,6 +830,36 @@ mod test {
         assert_eq!(y1.sizes(), &[1, 4]); // #PYTHON list(y1.shape)
         let y2 = x.unsqueeze(1)?;
         assert_eq!(y2.sizes(), &[4, 1]); // #PYTHON list(y2.shape)
+
+        Ok(())
+    }
+    #[test]
+    fn test_flash_powder_argmax() -> StableTorchResult<()> {
+        // https://docs.pytorch.org/docs/2.12/generated/torch.argmax.html#torch.argmax
+        /*
+            #|PYTHON
+            a = torch.tensor([[ 1.3398,  0.2663, -0.2686,  0.2450],
+                    [-0.7401, -0.8805, -0.3402, -1.1936],
+                    [ 0.4907, -1.3948, -1.0691, -0.3132],
+                    [-1.6092,  0.5419, -0.2993,  0.3195]])
+            y1 = torch.argmax(a)
+            y2 = torch.argmax(a, dim=1)
+        */
+
+        let x: Tensor = [
+            [1.3398, 0.2663, -0.2686, 0.2450],
+            [-0.7401, -0.8805, -0.3402, -1.1936],
+            [0.4907, -1.3948, -1.0691, -0.3132],
+            [-1.6092, 0.5419, -0.2993, 0.3195],
+        ]
+        .try_into()?;
+        assert_eq!(x.sizes(), &[4, 4]); // #PYTHON list(a.shape)
+        let y1 = x.argmax(None, None)?;
+        assert_eq!(y1.sizes(), &[]); // #PYTHON list(y1.shape)
+        assert_eq!(y1.as_i64()?, &0); // #PYTHON y1.item()
+        let y2 = x.argmax(Some(1), None)?;
+        assert_eq!(y2.sizes(), &[4]); // #PYTHON list(y2.shape)
+        assert_eq!(y2.i64s_ref()?, &[0, 2, 0, 1]); // #PYTHON y2.tolist()
 
         Ok(())
     }
