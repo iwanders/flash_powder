@@ -38,6 +38,39 @@ use crate::{data::DataMut, factory::EmptyOptions};
 use crate::dtype::ScalarDType;
 use zerocopy::{Immutable, IntoBytes, TryFromBytes};
 
+macro_rules! impl_scalar_conversion {
+    ($t:ty ) => {
+        impl TryInto<Tensor> for $t {
+            type Error = anyhow::Error;
+
+            fn try_into(self) -> Result<Tensor, Self::Error> {
+                let mut v = Tensor::empty(
+                    &[],
+                    &EmptyOptions {
+                        dtype: Some(<$t>::type_dtype()),
+                        ..Default::default()
+                    },
+                )?;
+                v.ds_mut::<$t>()?[0] = self;
+                Ok(v)
+            }
+        }
+    };
+}
+impl_scalar_conversion!(bool);
+impl_scalar_conversion!(f32);
+impl_scalar_conversion!(f64);
+
+impl_scalar_conversion!(u8);
+impl_scalar_conversion!(u16);
+impl_scalar_conversion!(u32);
+impl_scalar_conversion!(u64);
+
+impl_scalar_conversion!(i8);
+impl_scalar_conversion!(i16);
+impl_scalar_conversion!(i32);
+impl_scalar_conversion!(i64);
+
 impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy> TryInto<Tensor> for (T,) {
     type Error = anyhow::Error;
 
@@ -309,6 +342,34 @@ mod test {
         assert_eq!(d.dim(), 0); // #PYTHON d.dim()
         assert_eq!(d.i64_ref(&[])?, &5); // #PYTHON d.item()
         assert_eq!(d.dtype(), DType::I64); // #PYTHON d.dtype
+        assert_eq!(d.dtype(), DType::I64); // #PYTHON d.dtype
+
+        /*
+            #|PYTHON
+            d = torch.tensor(int(5))
+        */
+        let d: Tensor = 5i64.try_into()?;
+        assert_eq!(d.dim(), 0); // #PYTHON d.dim()
+        assert_eq!(d.i64_ref(&[])?, &5); // #PYTHON d.item()
+        assert_eq!(d.dtype(), DType::I64); // #PYTHON d.dtype
+
+        /*
+            #|PYTHON
+            d = torch.tensor(5.5)
+        */
+        let d: Tensor = 5.5.try_into()?;
+        assert_eq!(d.dim(), 0); // #PYTHON d.dim()
+        assert_eq!(d.f32_ref(&[])?, &5.5); // #PYTHON d.item()
+        assert_eq!(d.dtype(), DType::F32); // #PYTHON d.dtype
+
+        /*
+            #|PYTHON
+            d = torch.tensor(5.5).to(torch.double)
+        */
+        let d: Tensor = 5.5f64.try_into()?;
+        assert_eq!(d.dim(), 0); // #PYTHON d.dim()
+        assert_eq!(d.f32_ref(&[])?, &5.5); // #PYTHON d.item()
+        assert_eq!(d.dtype(), DType::F64); // #PYTHON d.dtype
 
         Ok(())
     }
