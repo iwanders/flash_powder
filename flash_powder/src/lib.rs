@@ -24,6 +24,14 @@
 //! - [`nn::layer`]: Implemented layers, these are nothing more than structs owning weights and calling into the appropriate [`functional`].
 //!
 
+/*
+
+Todo;
+    - if r: [2, 896, 1664], why doesn't r.i((0, .., ..)) make that [1, 896, 1664]?
+    - Printing is excruciatingly slow (even for Size([1, 896, 1664])), unusable for Size([1, 64, 448, 832])
+
+ */
+
 pub mod torch;
 
 pub mod core_methods;
