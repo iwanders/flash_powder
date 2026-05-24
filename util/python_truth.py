@@ -45,19 +45,19 @@ RUST_SCALAR_TYPES = RUST_INTS + RUST_FLOATS
 def torch_dtype_to_scalar_type(d) -> str:
     # https://github.com/pytorch/pytorch/blob/6a357dd272853cb6567bb277da62750013c76b4a/torch/csrc/stable/stableivalue_conversions.h#L114
     conversions = {
-        torch.bool: "ScalarType::Bool",
-        torch.float: "ScalarType::Float",
-        torch.double: "ScalarType::Double",
+        torch.bool: "DType::Bool",
+        torch.float: "DType::F32",
+        torch.double: "DType::F64",
         #
-        torch.int8: "ScalarType::Char",
-        torch.int16: "ScalarType::Short",
-        torch.int32: "ScalarType::Int",
-        torch.int64: "ScalarType::Long",
+        torch.int8: "DType::I8",
+        torch.int16: "DType::I16",
+        torch.int32: "DType::I32",
+        torch.int64: "DType::I64",
         #
-        torch.uint8: "ScalarType::Byte",
-        torch.uint16: "ScalarType::UInt16",
-        torch.uint32: "ScalarType::UInt32",
-        torch.uint64: "ScalarType::UInt64",
+        torch.uint8: "DType::U8",
+        torch.uint16: "DType::U16",
+        torch.uint32: "DType::U32",
+        torch.uint64: "DType::U64",
     }
     if d not in conversions:
         raise KeyError(f"Unsupported dtype: {d}")
