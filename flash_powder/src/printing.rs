@@ -8,6 +8,41 @@ use crate::index::TensorIndex;
 use crate::properties::TensorProperties;
 use crate::tensor::{Ten, TenMut, Tensor, TensorAccess};
 
+fn format_linear_tensor_at(
+    t: &Ten<'_>,
+    index: usize,
+    options: &crate::printing::ScalarPrintOptions,
+) -> StableTorchResult<String> {
+    use crate::dtype::DType;
+    macro_rules! generate_match {
+        // Matches: an expression, then a list of (pattern, result) pairs
+        ($val:expr, $(($r:ty, $p:pat)),*) => {
+            match $val {
+                $( $p => {
+                    let v = t.d_ref::<$r>(&[index])?;
+                    Ok(options.format(v))
+                }, )*  // Repeatedly generate each arm
+                _ => todo!("missing d_fmt for {:?}", $val),   // Optional: catch-all arm
+            }
+        };
+    }
+
+    generate_match!(
+        t.dtype(),
+        (f32, DType::F32),
+        (f64, DType::F64),
+        (u8, DType::U8),
+        (i8, DType::I8),
+        (u16, DType::U16),
+        (i16, DType::I16),
+        (u32, DType::U32),
+        (i32, DType::I32),
+        (i64, DType::I64),
+        (u64, DType::U64),
+        (bool, DType::Bool)
+    )
+}
+
 fn format_scalar_tensor(
     t: &Ten<'_>,
     options: &crate::printing::ScalarPrintOptions,
@@ -86,8 +121,7 @@ impl ScalarPrintOptions {
         }
     }
 }
-#[derive(Copy, Clone, Debug)]
-#[derive(Default)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct TensorPrintOptions {
     pub print_options: PrintOptions,
     pub scalar_options: ScalarPrintOptions,
@@ -119,31 +153,73 @@ impl<T: TensorAccess + TensorProperties + CoreMethods + DataRef + TensorIndex> P
 //
 // They do two passess, one to determine the width of the elements, then another to actually print.
 fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> String {
+    let v;
+    let t = if !t.is_contiguous() {
+        match t.contiguous() {
+            Ok(c) => {
+                v = Some(c);
+                v.as_ref().map(|z| z.ten().unwrap()).unwrap()
+            }
+            Err(_) => return "could not make contiguous tensor".to_owned(),
+        }
+    } else {
+        t.ten().unwrap()
+    };
+
+    let linear = t.view(&[t.numel()]).unwrap();
     let indent = options.indent;
     let summarize = options
         .summarize
         .unwrap_or(t.numel() > options.print_options.threshold);
 
-    let determine_width = |o: &T| -> usize {
+    let determine_width = |o: &Ten<'_>, linear: &Ten<'_>| -> usize {
         let mut m = 0;
         // This is not great... but we need a contiguous tensor here to iterate over it in 1d.
         // Should we implement ravel and have it return an enum?
-        let o = (*o).contiguous().unwrap();
-        let linear = o.view(&[o.numel()]).unwrap();
-        for i in 0..o.numel() {
+        // let o = (*o);
+        if summarize {
             m = m.max(
-                format_scalar_tensor(&linear.i(i as isize).unwrap(), &options.scalar_options)
-                    .unwrap()
-                    .len(),
-            )
+                (0..options.print_options.edgeitems)
+                    .map(|i| {
+                        format_linear_tensor_at(&linear, i, &options.scalar_options)
+                            .unwrap()
+                            .len()
+                    })
+                    .max()
+                    .unwrap_or(0),
+            );
+            m = m.max(
+                ((o.numel() - options.print_options.edgeitems)..(o.numel()))
+                    .map(|i| {
+                        format_linear_tensor_at(&linear, i, &options.scalar_options)
+                            .unwrap()
+                            .len()
+                    })
+                    .max()
+                    .unwrap_or(0),
+            );
+        } else {
+            for i in 0..o.numel() {
+                m = m.max(
+                    format_linear_tensor_at(&linear, i, &options.scalar_options)
+                        .unwrap()
+                        .len(),
+                )
+            }
         }
         m
     };
     let mut options = *options;
-    let element_width = options.element_width.unwrap_or(determine_width(t));
+    let element_width = options
+        .element_width
+        .unwrap_or(determine_width(&t, &linear));
     options.element_width = Some(element_width);
     // https://github.com/pytorch/pytorch/blob/8f8409cae86d725a75e2ac54ce8f93def107ced7/torch/_tensor_str.py#L242
-    let vector_str = |indent: usize, o: &T, element_width: usize, summarize: bool| -> String {
+    let vector_str = |indent: usize,
+                      o: &Ten<'_>,
+                      element_width: usize,
+                      summarize: bool|
+     -> String {
         let mut r = String::new();
         let element_length = element_width + ", ".len();
         let elements_per_line =
@@ -184,7 +260,7 @@ fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> S
         r += "]";
         r
     };
-    let tensor_str = |indent: usize, o: &T, summarize: bool| -> String {
+    let tensor_str = |indent: usize, o: &Ten<'_>, summarize: bool| -> String {
         let mut options = options;
         options.indent += 1;
         let mut r = String::new();
@@ -194,16 +270,16 @@ fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> S
         if summarize && t.size(0) > 2 * options.print_options.edgeitems {
             slices.extend(
                 (0..options.print_options.edgeitems)
-                    .map(|i| tensor_format(&crate::torch::select(t, 0, i).unwrap(), &options)),
+                    .map(|i| tensor_format(&crate::torch::select(&t, 0, i).unwrap(), &options)),
             );
             slices.push("...".to_owned());
             slices.extend(
                 (t.size(0) - (options.print_options.edgeitems)..t.size(0))
-                    .map(|i| tensor_format(&crate::torch::select(t, 0, i).unwrap(), &options)),
+                    .map(|i| tensor_format(&crate::torch::select(&t, 0, i).unwrap(), &options)),
             );
         } else {
             slices = (0..t.size(0))
-                .map(|i| tensor_format(&crate::torch::select(t, 0, i).unwrap(), &options))
+                .map(|i| tensor_format(&crate::torch::select(&t, 0, i).unwrap(), &options))
                 .collect();
         }
         r += "[";
@@ -214,16 +290,18 @@ fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> S
     };
 
     if t.dim() == 0 {
-        format_scalar_tensor(&t.ten().unwrap(), &options.scalar_options).unwrap().to_string()
+        format_scalar_tensor(&t.ten().unwrap(), &options.scalar_options)
+            .unwrap()
+            .to_string()
     } else if t.dim() == 1 {
-        let element_width = determine_width(t);
+        let element_width = determine_width(&t, &linear);
 
         let mut r = String::new();
-        r += &vector_str(indent + 1, t, element_width, summarize);
+        r += &vector_str(indent + 1, &t, element_width, summarize);
         r
     } else {
         let mut r = String::new();
-        r += &tensor_str(indent + 1, t, summarize);
+        r += &tensor_str(indent + 1, &t, summarize);
         r
     }
 }
@@ -385,6 +463,16 @@ mod test {
         assert_eq!(r.is_contiguous(), false);
         let d_2d = data_to_string(&r, &Default::default());
         assert_eq!(d_2d, "[ 1.0,  5.0,  9.0, 13.0]");
+
+        Ok(())
+    }
+    #[test]
+    fn test_flash_powder_debug_print_multidimensional() -> StableTorchResult<()> {
+        let d = Tensor::randn(&[1, 64, 448, 832], &Default::default())?;
+
+        let d_2d = data_to_string(&d, &Default::default());
+        //println!("d: {d_2d}");
+        // assert_eq!(d_2d, "[ 1.0,  5.0,  9.0, 13.0]");
 
         Ok(())
     }
