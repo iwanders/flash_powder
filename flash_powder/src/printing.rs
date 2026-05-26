@@ -8,6 +8,9 @@ use crate::index::TensorIndex;
 use crate::properties::TensorProperties;
 use crate::tensor::{Ten, TenMut, Tensor, TensorAccess};
 
+// This does not yet handle the whole int_mode or scientific mode from
+// https://github.com/pytorch/pytorch/blob/v2.12.0/torch/_tensor_str.py#L171-L209
+
 fn format_linear_tensor_at(
     t: &Ten<'_>,
     index: usize,
