@@ -66,13 +66,12 @@ impl Sequential {
             None
         }
     }
-    pub fn get(&self, index: usize) -> Option<&Box<dyn Module>> {
-        self.modules.get(index)
+    pub fn get(&self, index: usize) -> Option<&dyn Module> {
+        self.modules.get(index).map(|z| &**z)
     }
     pub fn get_as<T: Sized + 'static>(&self, index: usize) -> Option<&T> {
-        use std::ops::Deref;
         if let Some(v) = self.get(index) {
-            v.deref().as_any_ref().downcast_ref()
+            v.as_any_ref().downcast_ref()
         } else {
             None
         }

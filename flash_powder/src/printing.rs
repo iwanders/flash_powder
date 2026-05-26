@@ -184,7 +184,7 @@ fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> S
             m = m.max(
                 (0..options.print_options.edgeitems)
                     .map(|i| {
-                        format_linear_tensor_at(&linear, i, &options.scalar_options)
+                        format_linear_tensor_at(linear, i, &options.scalar_options)
                             .unwrap()
                             .len()
                     })
@@ -194,7 +194,7 @@ fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> S
             m = m.max(
                 ((o.numel() - options.print_options.edgeitems)..(o.numel()))
                     .map(|i| {
-                        format_linear_tensor_at(&linear, i, &options.scalar_options)
+                        format_linear_tensor_at(linear, i, &options.scalar_options)
                             .unwrap()
                             .len()
                     })
@@ -204,7 +204,7 @@ fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> S
         } else {
             for i in 0..o.numel() {
                 m = m.max(
-                    format_linear_tensor_at(&linear, i, &options.scalar_options)
+                    format_linear_tensor_at(linear, i, &options.scalar_options)
                         .unwrap()
                         .len(),
                 )
