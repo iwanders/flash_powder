@@ -177,7 +177,6 @@ fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> S
         let mut m = 0;
         // This is not great... but we need a contiguous tensor here to iterate over it in 1d.
         // Should we implement ravel and have it return an enum?
-        // let o = (*o);
         if summarize {
             m = m.max(
                 (0..options.print_options.edgeitems)
@@ -218,6 +217,9 @@ fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> S
         options.scalar_options.precision = Some(options.print_options.precision);
     }
     options.element_width = Some(element_width);
+    if options.scalar_options.width.is_none() {
+        options.scalar_options.width = options.element_width;
+    }
     // https://github.com/pytorch/pytorch/blob/8f8409cae86d725a75e2ac54ce8f93def107ced7/torch/_tensor_str.py#L242
     let vector_str =
         |indent: usize, o: &Ten<'_>, element_width: usize, summarize: bool| -> String {
