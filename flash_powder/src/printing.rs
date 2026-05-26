@@ -30,6 +30,14 @@ fn format_linear_tensor_at(
         };
     }
 
+    // Bleh...
+    if t.dtype() == DType::F16 {
+        let offset = index * 2;
+        let s = &t.data()?[offset + 0..offset + 2];
+        let v = crate::f16::F16::from_u16(u16::from_le_bytes([s[0], s[1]])).into_f64();
+        return Ok(options.format(&v));
+    }
+
     generate_match!(
         t.dtype(),
         (f32, DType::F32),
@@ -62,6 +70,13 @@ fn format_scalar_tensor(
                 _ => todo!("missing d_fmt for {:?}", $val),   // Optional: catch-all arm
             }
         };
+    }
+
+    // bleh
+    if t.dtype() == DType::F16 {
+        let s = &t.data()?[0..2];
+        let v = crate::f16::F16::from_u16(u16::from_le_bytes([s[0], s[1]])).into_f64();
+        return Ok(options.format(&v));
     }
 
     generate_match!(
@@ -496,6 +511,26 @@ mod test {
             "[[1.000, ..., 4.000],\n \
               ...,\n \
               [13.000, ..., 16.000]]"
+        );
+
+        // Show that the precision from the format string is propagated.
+        let z = format!("{d:.2?}");
+        assert_eq!(
+            z,
+            "Tensor([[ 1.00,  2.00,  3.00,  4.00],\n        \
+                     [ 5.00,  6.00,  7.00,  8.00],\n        \
+                     [ 9.00, 10.00, 11.00, 12.00],\n        \
+                     [13.00, 14.00, 15.00, 16.00]])"
+        );
+
+        let z = d.to(&crate::DType::F16.into())?;
+        let z = format!("{z:.2?}");
+        assert_eq!(
+            z,
+            "Tensor([[ 1.00,  2.00,  3.00,  4.00],\n        \
+                     [ 5.00,  6.00,  7.00,  8.00],\n        \
+                     [ 9.00, 10.00, 11.00, 12.00],\n        \
+                     [13.00, 14.00, 15.00, 16.00]])"
         );
 
         Ok(())

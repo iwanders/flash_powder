@@ -59,6 +59,8 @@ pub use torch_stable::stable::device::Device;
 
 pub use torch_stable;
 
+mod f16;
+
 /// The prelude that contains all the necessary traits.
 pub mod prelude {
     use super::*;
