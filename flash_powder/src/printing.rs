@@ -265,22 +265,101 @@ fn tensor_str(indent: usize, o: &Ten<'_>, summarize: bool, options: &TensorPrint
     r
 }
 
+// https://github.com/pytorch/pytorch/blob/8f8409cae86d725a75e2ac54ce8f93def107ced7/torch/_tensor_str.py#L242
+fn vector_str(
+    indent: usize,
+    o: &Ten<'_>,
+    element_width: usize,
+    summarize: bool,
+    options: &TensorPrintOptions,
+) -> String {
+    let mut r = String::new();
+    let element_length = element_width + ", ".len();
+    let elements_per_line = ((options.print_options.linewidth - indent) / element_length).max(1);
+    let mut local_options = options.scalar_options;
+    local_options.width = Some(element_width);
+    // println!(
+    //     "vector str with shape: {:?}  summarize: {summarize}",
+    //     o.shape()
+    // );
+    let mut element_str = vec![];
+    if summarize {
+        let left = o.narrow(0, 0, options.print_options.edgeitems).unwrap();
+        element_str.extend(
+            (0..left.numel()).map(|i| {
+                format_scalar_tensor(&left.i(i as isize).unwrap(), &local_options).unwrap()
+            }),
+        );
+        element_str.push("...".to_owned());
+        let right = o
+            .narrow(
+                0,
+                -(options.print_options.edgeitems as isize),
+                options.print_options.edgeitems,
+            )
+            .unwrap();
+        element_str.extend(
+            (0..right.numel()).map(|i| {
+                format_scalar_tensor(&right.i(i as isize).unwrap(), &local_options).unwrap()
+            }),
+        );
+    } else {
+        element_str = (0..o.numel())
+            .map(|i| {
+                format_scalar_tensor(
+                    &o.ten()
+                        .unwrap()
+                        .i(i as isize)
+                        .unwrap()
+                        .squeeze_dim(0)
+                        .unwrap(),
+                    &local_options,
+                )
+                .unwrap()
+            })
+            .collect();
+    }
+    let lines = element_str.chunks(elements_per_line);
+    let lines: Vec<String> = lines.map(|z| z.join(", ")).collect();
+    r += "[";
+    let joiner = format!(",\n{}", " ".repeat(indent));
+    r += &lines.join(&joiner);
+    r += "]";
+    r
+}
+
+enum ContinuousView<'a> {
+    Borrowed(Ten<'a>),
+    Owned(Tensor),
+}
+fn make_continuous<T: PrintRequirements>(t: &T) -> StableTorchResult<ContinuousView<'_>> {
+    if !t.is_contiguous() {
+        match t.contiguous() {
+            Ok(c) => Ok(ContinuousView::Owned(c)),
+            Err(_) => anyhow::bail!("could not make contiguous tensor"),
+        }
+    } else {
+        Ok(ContinuousView::Borrowed(t.ten()?))
+    }
+}
+impl<'a> ContinuousView<'a> {
+    fn ten(&'a self) -> StableTorchResult<Ten<'a>> {
+        match self {
+            ContinuousView::Borrowed(ten) => ten.ten(),
+            ContinuousView::Owned(tensor) => tensor.ten(),
+        }
+    }
+}
+
 // https://github.com/pytorch/pytorch/blob/8f8409cae86d725a75e2ac54ce8f93def107ced7/torch/_tensor_str.py#L130
 //
 // They do two passess, one to determine the width of the elements, then another to actually print.
 fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> String {
-    let v;
-    let t = if !t.is_contiguous() {
-        match t.contiguous() {
-            Ok(c) => {
-                v = Some(c);
-                v.as_ref().map(|z| z.ten().unwrap()).unwrap()
-            }
-            Err(_) => return "could not make contiguous tensor".to_owned(),
-        }
-    } else {
-        t.ten().unwrap()
+    let c = match make_continuous(t) {
+        Ok(v) => v,
+        Err(e) => return format!("<{e}>"),
     };
+    let t = &c.ten().unwrap();
 
     let linear = t.view(&[t.numel()]).unwrap();
     let indent = options.indent;
@@ -296,80 +375,27 @@ fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> S
 
     let element_width = options
         .element_width
-        .unwrap_or(determine_width(&t, &linear, summarize, &options));
+        .unwrap_or(determine_width(t, &linear, summarize, &options));
     options.element_width = Some(element_width);
 
     if options.scalar_options.width.is_none() {
         options.scalar_options.width = options.element_width;
     }
-    // https://github.com/pytorch/pytorch/blob/8f8409cae86d725a75e2ac54ce8f93def107ced7/torch/_tensor_str.py#L242
-    let vector_str =
-        |indent: usize, o: &Ten<'_>, element_width: usize, summarize: bool| -> String {
-            let mut r = String::new();
-            let element_length = element_width + ", ".len();
-            let elements_per_line =
-                ((options.print_options.linewidth - indent) / element_length).max(1);
-            let mut local_options = options.scalar_options;
-            local_options.width = Some(element_width);
-            // println!(
-            //     "vector str with shape: {:?}  summarize: {summarize}",
-            //     o.shape()
-            // );
-            let mut element_str = vec![];
-            if summarize {
-                let left = o.narrow(0, 0, options.print_options.edgeitems).unwrap();
-                element_str.extend((0..left.numel()).map(|i| {
-                    format_scalar_tensor(&left.i(i as isize).unwrap(), &local_options).unwrap()
-                }));
-                element_str.push("...".to_owned());
-                let right = o
-                    .narrow(
-                        0,
-                        -(options.print_options.edgeitems as isize),
-                        options.print_options.edgeitems,
-                    )
-                    .unwrap();
-                element_str.extend((0..right.numel()).map(|i| {
-                    format_scalar_tensor(&right.i(i as isize).unwrap(), &local_options).unwrap()
-                }));
-            } else {
-                element_str = (0..o.numel())
-                    .map(|i| {
-                        format_scalar_tensor(
-                            &o.ten()
-                                .unwrap()
-                                .i(i as isize)
-                                .unwrap()
-                                .squeeze_dim(0)
-                                .unwrap(),
-                            &local_options,
-                        )
-                        .unwrap()
-                    })
-                    .collect();
-            }
-            let lines = element_str.chunks(elements_per_line);
-            let lines: Vec<String> = lines.map(|z| z.join(", ")).collect();
-            r += "[";
-            let joiner = format!(",\n{}", " ".repeat(indent));
-            r += &lines.join(&joiner);
-            r += "]";
-            r
-        };
+
     // println!("At bottom... summarize: {summarize}");
     if t.dim() == 0 {
         format_scalar_tensor(&t.ten().unwrap(), &options.scalar_options)
             .unwrap()
             .to_string()
     } else if t.dim() == 1 {
-        let element_width = determine_width(&t, &linear, summarize, &options);
+        let element_width = determine_width(t, &linear, summarize, &options);
 
         let mut r = String::new();
-        r += &vector_str(indent + 1, &t, element_width, summarize);
+        r += &vector_str(indent + 1, t, element_width, summarize, &options);
         r
     } else {
         let mut r = String::new();
-        r += &tensor_str(indent + 1, &t, summarize, &options);
+        r += &tensor_str(indent + 1, t, summarize, &options);
         r
     }
 }
