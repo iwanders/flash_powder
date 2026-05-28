@@ -1,0 +1,13 @@
+# Intel MKL internal:
+
+{
+   suppression:manual@MKL_Read_ThreadENV_Count_Cores
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   fun:mm_internal_malloc
+   fun:mm_account_ptr_by_tid
+   fun:mkl_serv_malloc
+   fun:MKL_Read_ThreadENV_Count_Cores
+   fun:mkl_serv_domain_get_max_threads
+}

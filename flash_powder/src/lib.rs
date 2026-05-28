@@ -31,6 +31,7 @@ Todo;
         Example is squeeze_dim; https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L5856
 Nice to have:
     - Printing with scientific mode / int mode, see comment in printing.rs
+    - Summarized printing without copying the entire tensor to contiguous and cpu, only copy what is printed.
  */
 
 pub mod torch;

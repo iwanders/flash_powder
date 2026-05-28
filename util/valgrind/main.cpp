@@ -22,6 +22,11 @@ void run_torch_stable_to() {
   torch::stable::to(t, {torch::headeronly::ScalarType::Float} );
 }
 
+void run_torch_stable_empty_cuda() {
+  std::cout << "suppression@run_torch_stable_empty" << std::endl;
+  const std::optional<torch::stable::Device> device = torch::stable::Device("cuda");
+  torch::stable::empty(torch::headeronly::HeaderOnlyArrayRef<int64_t>{1,1,4,4}, {}, {}, device, {}, {});
+}
 
 void run_torch_stable_fill(){
   std::cout << "suppression@dispatch:aten::fill_Tensor" << std::endl;

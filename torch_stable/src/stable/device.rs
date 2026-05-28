@@ -72,13 +72,13 @@ impl std::convert::TryFrom<&str> for Device {
         })
     }
 }
-impl std::convert::Into<String> for Device {
-    fn into(self) -> String {
-        let device_type = format!("{:?}", self.device_type).to_lowercase();
-        let suffix = if self.device_index.0 == -1 {
+impl std::convert::From<Device> for String {
+    fn from(val: Device) -> Self {
+        let device_type = format!("{:?}", val.device_type).to_lowercase();
+        let suffix = if val.device_index.0 == -1 {
             "".to_owned()
         } else {
-            format!(":{}", self.device_index.0)
+            format!(":{}", val.device_index.0)
         };
         format!("{}{}", device_type, suffix)
     }

@@ -12,29 +12,23 @@
    fun:{closure#0}<std::thread::thread::Inner, std::alloc::System>
    fun:allocate_for_layout<core::mem::maybe_uninit::MaybeUninit<std::thread::thread::Inner>, alloc::sync::{impl#17}::new_uninit_in::{closure_env#0}<std::thread::thread::Inner, std::alloc::System>, fn(*mut u8) -> *mut alloc::sync::ArcInner<core::mem::maybe_uninit::MaybeUninit<std::thread::thread::Inner>>>
    fun:new_uninit_in<std::thread::thread::Inner, std::alloc::System>
-   fun:_ZN3std6thread6thread6Thread3new17h4f224c8800cafa06E
-   fun:_ZN3std6thread7current12init_current17h90b61221c4a15b07E
+   ...
    fun:current_or_unnamed
-   fun:_ZN3std4sync4mpmc7context7Context3new17h3c74fb50d21721c1E
+   ...
    fun:__rust_std_internal_init_fn
    fun:call_once<fn() -> core::cell::Cell<core::option::Option<std::sync::mpmc::context::Context>>, ()>
    fun:unwrap_or_else<core::cell::Cell<core::option::Option<std::sync::mpmc::context::Context>>, fn() -> core::cell::Cell<core::option::Option<std::sync::mpmc::context::Context>>>
-   fun:_ZN3std3sys12thread_local6native4lazy20Storage$LT$T$C$D$GT$16get_or_init_slow17hd59b4977a4c39388E
+   ...
    fun:get_or_init<core::cell::Cell<core::option::Option<std::sync::mpmc::context::Context>>, (), fn() -> core::cell::Cell<core::option::Option<std::sync::mpmc::context::Context>>>
    fun:{closure#0}
    fun:call_once<std::sync::mpmc::context::{impl#0}::with::CONTEXT::{constant#0}::{closure_env#0}, (core::option::Option<&mut core::option::Option<core::cell::Cell<core::option::Option<std::sync::mpmc::context::Context>>>>)>
    fun:try_with<core::cell::Cell<core::option::Option<std::sync::mpmc::context::Context>>, std::sync::mpmc::context::{impl#0}::with::{closure_env#1}<std::sync::mpmc::list::{impl#3}::recv::{closure_env#1}<test::event::CompletedTest>, ()>, ()>
    fun:with<std::sync::mpmc::list::{impl#3}::recv::{closure_env#1}<test::event::CompletedTest>, ()>
-   fun:_ZN3std4sync4mpmc4list16Channel$LT$T$GT$4recv17h3237f014df309666E
+   ...
    fun:recv_deadline<test::event::CompletedTest>
    fun:recv_timeout<test::event::CompletedTest>
    fun:recv_timeout<test::event::CompletedTest>
    fun:run_tests<test::console::run_tests_console::{closure_env#2}>
-   fun:_ZN4test7console17run_tests_console17h5c8b7b405f8d1174E
+   ...
    fun:test_main_with_exit_callback<test::test_main::{closure_env#0}>
-   fun:_ZN4test9test_main17h4cc548865b177b26E
-   fun:_ZN4test16test_main_static17hb3fb83b201af2d58E
-   fun:_ZN12flash_powder4main17ha5e9a86384c840bcE
-   fun:_ZN4core3ops8function6FnOnce9call_once17h9c21b1dd3b8e338aE
-   fun:_ZN3std3sys9backtrace28__rust_begin_short_backtrace17h4d2a344cb62f8587E
 }
