@@ -601,7 +601,6 @@ mod test {
     #[cfg(feature = "cuda")]
     #[test]
     fn test_flash_powder_debug_print_device_suffix() -> StableTorchResult<()> {
-        return Ok(());
         if !crate::torch::cuda::is_available() {
             return Ok(());
         }

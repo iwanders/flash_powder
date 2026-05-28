@@ -11,3 +11,84 @@
    fun:MKL_Read_ThreadENV_Count_Cores
    fun:mkl_serv_domain_get_max_threads
 }
+
+# Cuda stuff, these only showed up after I added printing of a cuda tensor.
+# The same test (test_flash_powder_debug_print_device_suffix) without cuda runs sparkly clean.
+{
+   suppression:manual@cuda_fun:cuLibraryLoadData
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   obj:*libcuda.so*
+   ...
+   obj:*libcuda.so*
+   obj:*libcuda.so*
+   obj:*libcuda.so*
+   fun:cuLibraryLoadData
+}
+
+# No idea, there's a bunch of callstacks fully in libcuda.
+{
+   suppression:manual@cuda_wildcard_calloc
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   obj:*libcuda.so*
+}
+
+{
+   suppression:manual@cuda_wildcard_malloc
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   obj:*libcuda.so*
+
+}
+
+# Looks like some thread local that's not cleaned up.
+{
+   suppression:manual@cuda_gomp
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   fun:calloc
+   fun:allocate_dtv
+   fun:_dl_allocate_tls
+   fun:allocate_stack
+   ...
+   fun:GOMP_parallel
+   ...
+}
+
+{
+   suppression:manual@cuda_cuInit
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   fun:calloc
+   fun:allocate_dtv
+   fun:_dl_allocate_tls
+   fun:allocate_stack
+   ...
+   fun:cuInit
+   ...
+}
+
+{
+   suppression:manual@cuda_caching_allocator_hook_init
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:_Znwm
+   fun:_ZN3c104cuda20CUDACachingAllocator6Native22NativeCachingAllocator4initEi
+   fun:_ZNK2at4cuda6detail9CUDAHooks4initEv
+}
+
+{
+   suppression:manual@cuda_caching_allocator_stream
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:_Znwm
+   fun:_ZN3c104cuda20CUDACachingAllocator6Native22DeviceCachingAllocator17alloc_found_blockERKNS2_12_GLOBAL__N_111AllocParamsEmSt10shared_ptrINS_15GatheredContextEEb
+   fun:_ZN3c104cuda20CUDACachingAllocator6Native22NativeCachingAllocator6mallocEPPvamP11CUstream_st
+   fun:_ZN3c104cuda20CUDACachingAllocator6Native22NativeCachingAllocator8allocateEm
+}
