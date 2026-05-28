@@ -328,25 +328,29 @@ fn vector_str(
     r
 }
 
-enum ContinuousView<'a> {
+enum ContiguousView<'a> {
     Borrowed(Ten<'a>),
     Owned(Tensor),
 }
-fn make_continuous<T: PrintRequirements>(t: &T) -> StableTorchResult<ContinuousView<'_>> {
+fn make_contiguous_cpu<T: PrintRequirements>(t: &T) -> StableTorchResult<ContiguousView<'_>> {
     if !t.is_contiguous() {
         match t.contiguous() {
-            Ok(c) => Ok(ContinuousView::Owned(c)),
+            Ok(c) => Ok(ContiguousView::Owned(c.to(&crate::Device::CPU.into())?)),
             Err(_) => anyhow::bail!("could not make contiguous tensor"),
         }
     } else {
-        Ok(ContinuousView::Borrowed(t.ten()?))
+        if t.device() == crate::Device::CPU {
+            Ok(ContiguousView::Borrowed(t.ten()?))
+        } else {
+            Ok(ContiguousView::Owned(t.to(&crate::Device::CPU.into())?))
+        }
     }
 }
-impl<'a> ContinuousView<'a> {
+impl<'a> ContiguousView<'a> {
     fn ten(&'a self) -> StableTorchResult<Ten<'a>> {
         match self {
-            ContinuousView::Borrowed(ten) => ten.ten(),
-            ContinuousView::Owned(tensor) => tensor.ten(),
+            ContiguousView::Borrowed(ten) => ten.ten(),
+            ContiguousView::Owned(tensor) => tensor.ten(),
         }
     }
 }
@@ -355,7 +359,7 @@ impl<'a> ContinuousView<'a> {
 //
 // They do two passess, one to determine the width of the elements, then another to actually print.
 fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> String {
-    let c = match make_continuous(t) {
+    let c = match make_contiguous_cpu(t) {
         Ok(v) => v,
         Err(e) => return format!("<{e}>"),
     };
@@ -426,6 +430,13 @@ fn tensor_format_with_formatter<T: TensorAccess + TensorProperties + CoreMethods
     };
 
     r += &tensor_format(&t.ten().unwrap(), &print_options);
+    if t.dtype() != crate::DType::F32 {
+        r += &format!(", dtype={:?}", t.dtype());
+    }
+    if t.device() != crate::Device::CPU {
+        let device_string: String = t.device().into();
+        r += &format!(", device={device_string}");
+    }
     r += ")";
     fmt.write_fmt(format_args!("{}", r))
 }
@@ -564,7 +575,7 @@ mod test {
             "Tensor([[ 1.00,  2.00,  3.00,  4.00],\n        \
                      [ 5.00,  6.00,  7.00,  8.00],\n        \
                      [ 9.00, 10.00, 11.00, 12.00],\n        \
-                     [13.00, 14.00, 15.00, 16.00]])"
+                     [13.00, 14.00, 15.00, 16.00]], dtype=F16)"
         );
 
         Ok(())
@@ -586,6 +597,36 @@ mod test {
 
         Ok(())
     }
+
+    #[cfg(feature = "cuda")]
+    #[test]
+    fn test_flash_powder_debug_print_device_suffix() -> StableTorchResult<()> {
+        if !crate::torch::cuda::is_available() {
+            return Ok(());
+        }
+
+        let d = Tensor::from(&[
+            [1.0f32, 2.0, 3.0, 4.0],
+            [5.0, 6.0, 7.0, 8.0],
+            [9.0, 10.0, 11.0, 12.0],
+            [13.0, 14.0, 15.0, 16.0],
+        ])?;
+        assert_eq!(d.sizes(), &[4, 4]); // #PYTHON list(d.shape)
+        let z = d
+            .to(&crate::DType::F16.into())?
+            .to(&crate::Device::CUDA.into())?;
+        let z = format!("{z:.2?}");
+        assert_eq!(
+            z,
+            "Tensor([[ 1.00,  2.00,  3.00,  4.00],\n        \
+                     [ 5.00,  6.00,  7.00,  8.00],\n        \
+                     [ 9.00, 10.00, 11.00, 12.00],\n        \
+                     [13.00, 14.00, 15.00, 16.00]], dtype=F16, device=cuda:0)"
+        );
+
+        Ok(())
+    }
+
     #[test]
     fn test_flash_powder_debug_print_multidimensional() -> StableTorchResult<()> {
         // Mostly here as a dev aid.
