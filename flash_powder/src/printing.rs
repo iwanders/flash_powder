@@ -167,6 +167,104 @@ impl<T: TensorAccess + TensorProperties + CoreMethods + DataRef + TensorIndex> P
 {
 }
 
+fn determine_width(
+    o: &Ten<'_>,
+    linear: &Ten<'_>,
+    summarize: bool,
+    options: &TensorPrintOptions,
+) -> usize {
+    let mut m = 0;
+    // This is not great... but we need a contiguous tensor here to iterate over it in 1d.
+    // Should we implement ravel and have it return an enum?
+    if summarize {
+        m = m.max(
+            (0..options.print_options.edgeitems)
+                .map(|i| {
+                    format_linear_tensor_at(linear, i, &options.scalar_options)
+                        .unwrap()
+                        .len()
+                })
+                .max()
+                .unwrap_or(0),
+        );
+        m = m.max(
+            ((o.numel() - options.print_options.edgeitems)..(o.numel()))
+                .map(|i| {
+                    format_linear_tensor_at(linear, i, &options.scalar_options)
+                        .unwrap()
+                        .len()
+                })
+                .max()
+                .unwrap_or(0),
+        );
+    } else {
+        for i in 0..o.numel() {
+            m = m.max(
+                format_linear_tensor_at(linear, i, &options.scalar_options)
+                    .unwrap()
+                    .len(),
+            )
+        }
+    }
+    m
+}
+
+// https://github.com/pytorch/pytorch/blob/8f8409cae86d725a75e2ac54ce8f93def107ced7/torch/_tensor_str.py#L292-L295
+fn tensor_str(indent: usize, o: &Ten<'_>, summarize: bool, options: &TensorPrintOptions) -> String {
+    let mut options = *options;
+    options.summarize = Some(summarize);
+    options.indent += 1;
+    let mut r = String::new();
+    // Okay... the big one.
+    let mut slices: Vec<String> = vec![];
+    // https://github.com/pytorch/pytorch/blob/8f8409cae86d725a75e2ac54ce8f93def107ced7/torch/_tensor_str.py#L304
+    // println!(
+    //     "o.size: {}, 2 * options.print_options.edgeitems {}  summarize: {summarize}",
+    //     o.size(0),
+    //     2 * options.print_options.edgeitems
+    // );
+    if summarize && o.size(0) > 2 * options.print_options.edgeitems {
+        slices.extend((0..options.print_options.edgeitems).map(|i| {
+            tensor_format(
+                &crate::torch::select(o, 0, i)
+                    .unwrap()
+                    .squeeze_dim(0)
+                    .unwrap(),
+                &options,
+            )
+        }));
+        slices.push("...".to_owned());
+        slices.extend(
+            (o.size(0) - (options.print_options.edgeitems)..o.size(0)).map(|i| {
+                tensor_format(
+                    &crate::torch::select(o, 0, i)
+                        .unwrap()
+                        .squeeze_dim(0)
+                        .unwrap(),
+                    &options,
+                )
+            }),
+        );
+    } else {
+        slices = (0..o.size(0))
+            .map(|i| {
+                tensor_format(
+                    &crate::torch::select(o, 0, i)
+                        .unwrap()
+                        .squeeze_dim(0)
+                        .unwrap(),
+                    &options,
+                )
+            })
+            .collect();
+    }
+    r += "[";
+    let joiner = format!(",{}{}", "\n".repeat(o.dim() - 1), " ".repeat(indent));
+    r += &slices.join(&joiner);
+    r += "]";
+    r
+}
+
 // https://github.com/pytorch/pytorch/blob/8f8409cae86d725a75e2ac54ce8f93def107ced7/torch/_tensor_str.py#L130
 //
 // They do two passess, one to determine the width of the elements, then another to actually print.
@@ -191,50 +289,16 @@ fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> S
         .unwrap_or(t.numel() > options.print_options.threshold);
     // println!("summarize in tensor_format: {summarize:?}");
 
-    let determine_width = |o: &Ten<'_>, linear: &Ten<'_>| -> usize {
-        let mut m = 0;
-        // This is not great... but we need a contiguous tensor here to iterate over it in 1d.
-        // Should we implement ravel and have it return an enum?
-        if summarize {
-            m = m.max(
-                (0..options.print_options.edgeitems)
-                    .map(|i| {
-                        format_linear_tensor_at(linear, i, &options.scalar_options)
-                            .unwrap()
-                            .len()
-                    })
-                    .max()
-                    .unwrap_or(0),
-            );
-            m = m.max(
-                ((o.numel() - options.print_options.edgeitems)..(o.numel()))
-                    .map(|i| {
-                        format_linear_tensor_at(linear, i, &options.scalar_options)
-                            .unwrap()
-                            .len()
-                    })
-                    .max()
-                    .unwrap_or(0),
-            );
-        } else {
-            for i in 0..o.numel() {
-                m = m.max(
-                    format_linear_tensor_at(linear, i, &options.scalar_options)
-                        .unwrap()
-                        .len(),
-                )
-            }
-        }
-        m
-    };
     let mut options = *options;
-    let element_width = options
-        .element_width
-        .unwrap_or(determine_width(&t, &linear));
     if options.scalar_options.precision.is_none() {
         options.scalar_options.precision = Some(options.print_options.precision);
     }
+
+    let element_width = options
+        .element_width
+        .unwrap_or(determine_width(&t, &linear, summarize, &options));
     options.element_width = Some(element_width);
+
     if options.scalar_options.width.is_none() {
         options.scalar_options.width = options.element_width;
     }
@@ -292,76 +356,20 @@ fn tensor_format<T: PrintRequirements>(t: &T, options: &TensorPrintOptions) -> S
             r += "]";
             r
         };
-    // https://github.com/pytorch/pytorch/blob/8f8409cae86d725a75e2ac54ce8f93def107ced7/torch/_tensor_str.py#L292-L295
-    let tensor_str = |indent: usize, o: &Ten<'_>, summarize: bool| -> String {
-        let mut options = options;
-        options.summarize = Some(summarize);
-        options.indent += 1;
-        let mut r = String::new();
-        // Okay... the big one.
-        let mut slices: Vec<String> = vec![];
-        // https://github.com/pytorch/pytorch/blob/8f8409cae86d725a75e2ac54ce8f93def107ced7/torch/_tensor_str.py#L304
-        // println!(
-        //     "o.size: {}, 2 * options.print_options.edgeitems {}  summarize: {summarize}",
-        //     o.size(0),
-        //     2 * options.print_options.edgeitems
-        // );
-        if summarize && o.size(0) > 2 * options.print_options.edgeitems {
-            slices.extend((0..options.print_options.edgeitems).map(|i| {
-                tensor_format(
-                    &crate::torch::select(&t, 0, i)
-                        .unwrap()
-                        .squeeze_dim(0)
-                        .unwrap(),
-                    &options,
-                )
-            }));
-            slices.push("...".to_owned());
-            slices.extend(
-                (t.size(0) - (options.print_options.edgeitems)..t.size(0)).map(|i| {
-                    tensor_format(
-                        &crate::torch::select(&t, 0, i)
-                            .unwrap()
-                            .squeeze_dim(0)
-                            .unwrap(),
-                        &options,
-                    )
-                }),
-            );
-        } else {
-            slices = (0..t.size(0))
-                .map(|i| {
-                    tensor_format(
-                        &crate::torch::select(&t, 0, i)
-                            .unwrap()
-                            .squeeze_dim(0)
-                            .unwrap(),
-                        &options,
-                    )
-                })
-                .collect();
-        }
-        r += "[";
-        let joiner = format!(",{}{}", "\n".repeat(o.dim() - 1), " ".repeat(indent));
-        r += &slices.join(&joiner);
-        r += "]";
-        r
-    };
-
     // println!("At bottom... summarize: {summarize}");
     if t.dim() == 0 {
         format_scalar_tensor(&t.ten().unwrap(), &options.scalar_options)
             .unwrap()
             .to_string()
     } else if t.dim() == 1 {
-        let element_width = determine_width(&t, &linear);
+        let element_width = determine_width(&t, &linear, summarize, &options);
 
         let mut r = String::new();
         r += &vector_str(indent + 1, &t, element_width, summarize);
         r
     } else {
         let mut r = String::new();
-        r += &tensor_str(indent + 1, &t, summarize);
+        r += &tensor_str(indent + 1, &t, summarize, &options);
         r
     }
 }
@@ -469,15 +477,15 @@ mod test {
         let d_1d = data_to_string(&d.view(&[d.numel()])?, &Default::default());
         assert_eq!(
             d_1d,
-            "[1.0000, 2.0000, 3.0000, 4.0000, 5.0000, 6.0000, 7.0000, 8.0000, 9.0000, 10.0000, 11.0000, 12.0000, 13.0000,\n \
+            "[ 1.0000,  2.0000,  3.0000,  4.0000,  5.0000,  6.0000,  7.0000,  8.0000,\n  9.0000, 10.0000, 11.0000, 12.0000, 13.0000, \
                14.0000, 15.0000, 16.0000]"
         );
         let d_2d = data_to_string(&d.view(&[4, 4])?, &Default::default());
         // println!("{d_2d}");
         assert_eq!(
             d_2d,
-            "[[1.0000, 2.0000, 3.0000, 4.0000],\n \
-              [5.0000, 6.0000, 7.0000, 8.0000],\n \
+            "[[ 1.0000,  2.0000,  3.0000,  4.0000],\n \
+              [ 5.0000,  6.0000,  7.0000,  8.0000],\n \
               [ 9.0000, 10.0000, 11.0000, 12.0000],\n \
               [13.0000, 14.0000, 15.0000, 16.0000]]"
         );
@@ -485,8 +493,8 @@ mod test {
         // println!("{d_3d}");
         assert_eq!(
             d_3d,
-            "[[[1.0000, 2.0000, 3.0000, 4.0000],\n  \
-            [5.0000, 6.0000, 7.0000, 8.0000]],\n\n \
+            "[[[ 1.0000,  2.0000,  3.0000,  4.0000],\n  \
+            [ 5.0000,  6.0000,  7.0000,  8.0000]],\n\n \
             [[ 9.0000, 10.0000, 11.0000, 12.0000],\n  \
             [13.0000, 14.0000, 15.0000, 16.0000]]]"
         );
@@ -508,7 +516,7 @@ mod test {
         // println!("{d_2d}");
         assert_eq!(
             d_2d,
-            "[[1.000, ..., 4.000],\n \
+            "[[ 1.000, ...,  4.000],\n \
               ...,\n \
               [13.000, ..., 16.000]]"
         );
@@ -548,7 +556,7 @@ mod test {
         let r = d.i((.., 0))?;
         assert_eq!(r.is_contiguous(), false);
         let d_2d = data_to_string(&r, &Default::default());
-        assert_eq!(d_2d, "[1.0000, 5.0000, 9.0000, 13.0000]");
+        assert_eq!(d_2d, "[ 1.0000,  5.0000,  9.0000, 13.0000]");
 
         Ok(())
     }
