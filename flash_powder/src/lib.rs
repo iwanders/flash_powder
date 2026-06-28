@@ -32,6 +32,11 @@ Todo;
 Nice to have:
     - Printing with scientific mode / int mode, see comment in printing.rs
     - Summarized printing without copying the entire tensor to contiguous and cpu, only copy what is printed.
+
+Tricky:
+    - Indexing with tensors with index.Tensor always returns a copy, but the current indexing system returns a view.
+      We can't reconcile this without an extra method, or indexing overload or something. For now we can use index_tensor,
+
  */
 
 pub mod torch;

@@ -41,7 +41,16 @@ use torch_stable::stable::tensor::Tensor as StableTensor;
 // That https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/TensorIndexing.h#L438 looks very complex :/
 //
 
+/*
+
+Tricky:
+    - Indexing with tensors with index.Tensor always returns a copy, but the current indexing system returns a view.
+      We can't reconcile this without an extra method, or indexing overload or something. For now we can use index_tensor,
+*/
+
+#[derive(Clone)]
 pub enum TensorIndexOptions<'a> {
+    // Can we even do this? this indexing method seems to return a copy instead of a view.
     Tensor(&'a StableTensor),
     Index(isize),
     Range(std::ops::Range<isize>),
@@ -84,6 +93,11 @@ impl<'a> From<std::ops::RangeFull> for TensorIndexOptions<'a> {
         TensorIndexOptions::RangeFull
     }
 }
+// impl<'a> From<&'a Ten<'_>> for TensorIndexOptions<'a> {
+//     fn from(val: &'a Ten<'_>) -> Self {
+//         TensorIndexOptions::Tensor(val.get_tensor())
+//     }
+// }
 
 trait TensorIndexWorker: CoreMethods {
     fn do_the_real_indexing<'a, 'b>(
