@@ -122,6 +122,25 @@ impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const V: usiz
         Ok(v)
     }
 }
+
+impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const V: usize> TryInto<Tensor>
+    for &[[T; V]]
+{
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<Tensor, Self::Error> {
+        let mut v = Tensor::empty(
+            &[self.len(), V],
+            &EmptyOptions {
+                dtype: Some(T::type_dtype()),
+                ..Default::default()
+            },
+        )?;
+        v.data_mut()?.copy_from_slice(self.as_bytes());
+        Ok(v)
+    }
+}
+
 // And its ref;
 impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const V: usize> TryInto<Tensor>
     for &[T; V]
@@ -141,8 +160,11 @@ impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const V: usiz
     }
 }
 
-impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const C: usize, const R: usize>
-    TryInto<Tensor> for [[T; C]; R]
+impl<
+        T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
+        const C: usize,
+        const R: usize,
+    > TryInto<Tensor> for [[T; C]; R]
 {
     type Error = anyhow::Error;
 
@@ -159,8 +181,11 @@ impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const C: usiz
     }
 }
 // and its ref;
-impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const C: usize, const R: usize>
-    TryInto<Tensor> for &[[T; C]; R]
+impl<
+        T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
+        const C: usize,
+        const R: usize,
+    > TryInto<Tensor> for &[[T; C]; R]
 {
     type Error = anyhow::Error;
 
@@ -178,11 +203,11 @@ impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const C: usiz
 }
 
 impl<
-    T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
-    const C: usize,
-    const R: usize,
-    const D: usize,
-> TryInto<Tensor> for [[[T; C]; R]; D]
+        T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
+        const C: usize,
+        const R: usize,
+        const D: usize,
+    > TryInto<Tensor> for [[[T; C]; R]; D]
 {
     type Error = anyhow::Error;
 
@@ -200,11 +225,11 @@ impl<
 }
 // and its ref;
 impl<
-    T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
-    const C: usize,
-    const R: usize,
-    const D: usize,
-> TryInto<Tensor> for &[[[T; C]; R]; D]
+        T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
+        const C: usize,
+        const R: usize,
+        const D: usize,
+    > TryInto<Tensor> for &[[[T; C]; R]; D]
 {
     type Error = anyhow::Error;
 
@@ -224,10 +249,10 @@ impl<
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::StableTorchResult;
     use crate::data::DataRef;
     use crate::dtype::DType;
     use crate::properties::TensorProperties;
+    use crate::StableTorchResult;
 
     #[test]
     fn test_tensor_try_from() -> StableTorchResult<()> {
@@ -297,9 +322,7 @@ mod test {
         assert_eq!(d.sizes(), &[2, 3]); // #PYTHON list(d.shape)
         assert_eq!(
             d.data()?,
-            &[
-                0, 0, 160, 64, 0, 0, 64, 64, 0, 0, 160, 64, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 0, 0
-            ]
+            &[0, 0, 160, 64, 0, 0, 64, 64, 0, 0, 160, 64, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 0, 0]
         ); // #PYTHON d.view(torch.uint8).view(-1).tolist()
         assert_eq!(d.dtype(), DType::F32); // #PYTHON d.dtype
 
@@ -311,9 +334,7 @@ mod test {
         assert_eq!(d.sizes(), &[3, 2]); // #PYTHON list(d.shape)
         assert_eq!(
             d.data()?,
-            &[
-                0, 0, 160, 64, 0, 0, 64, 64, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 128, 63, 0, 0, 0, 64
-            ]
+            &[0, 0, 160, 64, 0, 0, 64, 64, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 128, 63, 0, 0, 0, 64]
         ); // #PYTHON d.view(torch.uint8).view(-1).tolist()
         assert_eq!(d.dtype(), DType::F32); // #PYTHON d.dtype
 
@@ -333,6 +354,21 @@ mod test {
             ]
         ); // #PYTHON d.view(torch.uint8).view(-1).tolist()
         assert_eq!(d.dtype(), DType::I64); // #PYTHON d.dtype
+
+        // And a slice of arrays.
+        /*
+            #|PYTHON
+            d = torch.tensor([(0.0, 0.0, 0.0), [1.0, 3.3, 5.5]])
+        */
+        let mut colors = vec![[0.0f32, 0.0, 0.0]];
+        colors.push((1.0, 3.3, 5.5).into());
+        let d = Tensor::from(&colors[..])?;
+        assert_eq!(d.sizes(), &[2, 3]); // #PYTHON list(d.shape)
+        assert_eq!(
+            d.data()?,
+            &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 51, 51, 83, 64, 0, 0, 176, 64]
+        ); // #PYTHON d.view(torch.uint8).view(-1).tolist()
+        assert_eq!(d.dtype(), DType::F32); // #PYTHON d.dtype
 
         /*
             #|PYTHON
