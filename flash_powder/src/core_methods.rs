@@ -258,6 +258,33 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         let r: StableTensor = stack[0].try_into()?;
         Ok(Tensor::new(r))
     }
+
+    // https://docs.pytorch.org/cppdocs/api/aten/indexing.html#tensor-indexing
+    // the C++ API uses the index and index_put_ methods:
+
+    /// Index with tensor.
+    ///
+    /// This retrieves a new tensor by looking up the indices.
+    ///
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L3092-L3102)
+    /// - pytorch method... I'm not actually sure :< it's just self[indices], but not sure to what that maps.
+    fn index_tensor<T: TensorAccess>(&self, indices: &[T]) -> StableTorchResult<Tensor> {
+        // func: index.Tensor(Tensor self, Tensor?[] indices) -> Tensor
+        let indices: Vec<Option<&StableTensor>> =
+            indices.iter().map(|z| Some(z.get_tensor())).collect();
+        let indices: Vec<StableIValue> = indices[..]
+            .iter()
+            .map(|z| {
+                let a: StableIValue = z.into();
+                a
+            })
+            .collect();
+        let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), indices[..].into()];
+        unsafe_call_dispatch_bail!("aten::index", "Tensor", stack.as_mut_slice());
+        let r: StableTensor = stack[0].try_into()?;
+        Ok(Tensor::new(r))
+    }
 }
 impl CoreMethods for Tensor {}
 impl<'a> CoreMethods for Ten<'a> {}
@@ -953,6 +980,37 @@ mod test {
         */
         x.copy_(&x2)?;
         assert_eq!(x.f64s_ref()?, &[0.0, 1.0, 0.0]); // #PYTHON x.tolist()
+
+        Ok(())
+    }
+    #[test]
+    fn test_flash_powder_core_method_index_tensor() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            color_lookup = torch.tensor([(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)])
+
+            the_indices = torch.tensor([0, 1, 2, 2, 1, 0, 1,2,0], dtype=torch.long)
+
+            combined = color_lookup[the_indices]
+        */
+        let color_lookup = Tensor::from(&[[1.0f32, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])?;
+        assert_eq!(color_lookup.sizes(), &[3, 3]); // #PYTHON list(color_lookup.shape)
+        assert_eq!(color_lookup.dtype(), DType::F32); // #PYTHON color_lookup.dtype
+
+        let the_indices = Tensor::from(&[0i64, 1, 2, 2, 1, 0, 1, 2, 0])?;
+        assert_eq!(the_indices.sizes(), &[9]); // #PYTHON list(the_indices.shape)
+        assert_eq!(the_indices.dtype(), DType::I64); // #PYTHON the_indices.dtype
+
+        let combined = color_lookup.index_tensor(&[the_indices])?;
+        assert_eq!(combined.sizes(), &[9, 3]); // #PYTHON list(combined.shape)
+
+        assert_eq!(
+            combined.f32s_ref()?,
+            &[
+                1.0f32, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
+                0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0
+            ]
+        ); // #PYTHON combined.ravel().tolist()
 
         Ok(())
     }
