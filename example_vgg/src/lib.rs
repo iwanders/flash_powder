@@ -161,12 +161,12 @@ pub fn main() -> Result<(), anyhow::Error> {
     // Load safetensors and wrap
     let data = std::fs::read(weights).expect("Unable to read file");
     let tensors = flash_powder_safetensors::safetensors::SafeTensors::deserialize(&data)?;
-    let our_safetensor = flash_powder_safetensors::SafetensorReader::from_safetensors(&tensors);
+    let reader = flash_powder_safetensors::SafetensorReader::from_safetensors(&tensors);
 
     // Instantiate vgg network and load its weights.
     let features = make_layers(CFG_A)?;
     let mut vgg = VGG::new(features)?;
-    vgg.load_state_dict(&our_safetensor)?;
+    vgg.load_state_dict(&reader)?;
 
     // Move to cuda if available.
     let use_cuda = fp::torch::cuda::is_available();
