@@ -34,8 +34,9 @@ Nice to have:
     - Summarized printing without copying the entire tensor to contiguous and cpu, only copy what is printed.
 
 Tricky:
-    - Indexing with tensors with index.Tensor always returns a copy, but the current indexing system returns a view.
+    - Indexing with tensors with "index.Tensor" always returns a copy, but the current indexing system returns a view.
       We can't reconcile this without an extra method, or indexing overload or something. For now we can use index_tensor,
+    - Currently reading a statedict doesn't clear optional tensors.
 
  */
 

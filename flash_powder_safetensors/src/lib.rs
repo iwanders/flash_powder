@@ -3,7 +3,30 @@
 //! Core functionality provided by [`SafetensorReader`].
 //!
 //!
+//! ```rust
+//!# fn test_minimal() -> Result<(), anyhow::Error> {
+//!# use flash_powder_safetensors::*;
+//!# use flash_powder as fp;
+//!# use fp::{nn, nn::Module};
+//!# use fp::prelude::*;
+//!     // We create some dummy safetensor data here:
+//!     let weight = fp::Tensor::from(&[3.3])?;
+//!     let content = vec![("weight", SafetensorView::new(&weight).unwrap())];
+//!     let safetensor_bytes = safetensors::tensor::serialize(content, None)?;
 //!
+//!     // Then deserialize this, normally safetensor_bytes would come from disk!
+//!     let tensors = safetensors::SafeTensors::deserialize(&safetensor_bytes)?;
+//!     let reader = SafetensorReader::from_safetensors(&tensors);
+//!
+//!     // Create the destination nn::Module object.
+//!     let mut new_linear = fp::nn::Linear::new_without_bias(1, 1)?;
+//!     // Read into its tensors.
+//!     new_linear.load_state_dict(&reader)?;
+//!     assert!(new_linear.weight.equal(&fp::Tensor::from(&[3.3])?)?);
+//!
+//!#    Ok(())
+//!# }
+//! ```
 //!
 
 // Todo, use a borrowed blob; https://github.com/pytorch/pytorch/blob/6a641f6777594fcd2f34ea32f7ee2c0cdaa55776/torch/csrc/stable/ops.h#L680-L725
@@ -51,26 +74,23 @@ pub fn flash_powder_dtype_to_safetensor_dtype(v: fp::DType) -> safetensors::Dtyp
         fp::DType::F16 => safetensors::Dtype::F16,
         fp::DType::F32 => safetensors::Dtype::F32,
         fp::DType::F64 => safetensors::Dtype::F64,
-        flash_powder::DType::U8 => todo!(),
-        flash_powder::DType::I8 => todo!(),
-        flash_powder::DType::I16 => todo!(),
+        flash_powder::DType::U8 => safetensors::Dtype::U8,
+        flash_powder::DType::I8 => safetensors::Dtype::I8,
+        flash_powder::DType::I16 => safetensors::Dtype::I16,
         flash_powder::DType::I32 => safetensors::Dtype::I32,
-        flash_powder::DType::I64 => todo!(),
-        flash_powder::DType::F16 => todo!(),
-        flash_powder::DType::F32 => todo!(),
-        flash_powder::DType::F64 => todo!(),
+        flash_powder::DType::I64 => safetensors::Dtype::I64,
         flash_powder::DType::Complex32 => todo!(),
-        flash_powder::DType::Complex64 => todo!(),
+        flash_powder::DType::Complex64 => safetensors::Dtype::C64,
         flash_powder::DType::Complex128 => todo!(),
-        flash_powder::DType::Bool => todo!(),
-        flash_powder::DType::U16 => todo!(),
-        flash_powder::DType::U32 => todo!(),
-        flash_powder::DType::U64 => todo!(),
-        flash_powder::DType::F8_e5m2 => todo!(),
+        flash_powder::DType::Bool => safetensors::Dtype::BOOL,
+        flash_powder::DType::U16 => safetensors::Dtype::U16,
+        flash_powder::DType::U32 => safetensors::Dtype::U32,
+        flash_powder::DType::U64 => safetensors::Dtype::U64,
+        flash_powder::DType::F8_e5m2 => safetensors::Dtype::F8_E5M2,
         flash_powder::DType::F8_e4m3fn => todo!(),
-        flash_powder::DType::F8_e5m2fnuz => todo!(),
-        flash_powder::DType::F8_e4m3fnuz => todo!(),
-        flash_powder::DType::F8_e8m0fnu => todo!(),
+        flash_powder::DType::F8_e5m2fnuz => safetensors::Dtype::F8_E5M2FNUZ,
+        flash_powder::DType::F8_e4m3fnuz => safetensors::Dtype::F8_E4M3FNUZ,
+        flash_powder::DType::F8_e8m0fnu => safetensors::Dtype::F8_E8M0,
         flash_powder::DType::F4_e2m1fn_x2 => todo!(),
         flash_powder::DType::BF16 => todo!(),
     }
@@ -196,33 +216,20 @@ mod test {
     }
     #[test]
     fn test_minimal() -> Result<(), anyhow::Error> {
-        let weight = fp::Tensor::from(&[1])?;
-        let bias = fp::Tensor::from(&[1])?;
-        let conv = fp::nn::Linear {
-            weight,
-            bias: Some(bias),
-        };
-        println!("weight: {conv:?}");
+        // We create some dummy safetensor data here:
+        let weight = fp::Tensor::from(&[3.3])?;
+        let content = vec![("weight", SafetensorView::new(&weight).unwrap())];
+        let safetensor_bytes = safetensors::tensor::serialize(content, None)?;
 
-        let adapted = conv.state_dict()?;
-
-        let safetensor_bytes = safetensors::tensor::serialize(
-            adapted
-                .as_map()
-                .iter()
-                .map(|(k, v)| (k, SafetensorView::new(v.as_tensor().unwrap()).unwrap())),
-            None,
-        )?;
-        assert!(!safetensor_bytes.is_empty());
-
-        // Super cool, now load our serialized data again.
+        // Then deserialize this, normally safetensor_bytes would come from disk!
         let tensors = safetensors::SafeTensors::deserialize(&safetensor_bytes)?;
         let reader = SafetensorReader::from_safetensors(&tensors);
 
-        let mut new_conv = fp::nn::Linear::new(1, 1)?;
-        new_conv.load_state_dict(&reader)?;
-        println!("weight: {new_conv:?}");
-        assert!(conv.weight.equal(&new_conv.weight)?);
+        // Create the destination nn::Module object.
+        let mut new_linear = fp::nn::Linear::new_without_bias(1, 1)?;
+        // Read into its tensors.
+        new_linear.load_state_dict(&reader)?;
+        assert!(new_linear.weight.equal(&fp::Tensor::from(&[3.3])?)?);
 
         Ok(())
     }
