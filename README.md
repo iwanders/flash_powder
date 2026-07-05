@@ -40,6 +40,11 @@ There's some support tooling in the contrib submodule, but it's mostly there for
 
 The functionality in this crate is a subset of the upstream functionality, it does not follow Rust lifetimes or safety guarantees.
 
+
+### flash_powder_safetensors
+
+Helper utilities for working with [safetensors](https://huggingface.co/docs/safetensors/index) are available in the [flash_powder_safetensors](./flash_powder_safetensors) crate.
+
 ## Usage
 
 Run this to add the dependency to a cargo project in both `build-dependencies` and `dependencies`;

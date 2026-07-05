@@ -2,6 +2,9 @@
 //!
 //! Core functionality provided by [`SafetensorReader`].
 //!
+//! Currently not zero copy, tensors or owning and on the cpu.
+//!
+//! Example usage:
 //!
 //! ```rust
 //!# fn test_minimal() -> Result<(), anyhow::Error> {
@@ -40,7 +43,7 @@ use flash_powder::prelude::*;
 pub use safetensors;
 use safetensors::SafeTensors;
 
-/// Converter to go from safetensors DType to flash_powder DType
+/// Convert [`safetensors::Dtype`] to [`fp::DType`].
 pub fn safetensor_dtype_to_flash_powder_dtype(v: safetensors::Dtype) -> fp::DType {
     match v {
         safetensors::Dtype::F16 => fp::DType::F16,
@@ -69,6 +72,7 @@ pub fn safetensor_dtype_to_flash_powder_dtype(v: safetensors::Dtype) -> fp::DTyp
     }
 }
 
+/// Convert [`fp::DType`] to [`safetensors::Dtype`].
 pub fn flash_powder_dtype_to_safetensor_dtype(v: fp::DType) -> safetensors::Dtype {
     match v {
         fp::DType::F16 => safetensors::Dtype::F16,
@@ -96,7 +100,9 @@ pub fn flash_powder_dtype_to_safetensor_dtype(v: fp::DType) -> safetensors::Dtyp
     }
 }
 
-/// Convert a tensor by `name` from `tensors` into a flash powder Tensor.
+/// Extract a [`fp::Tensor`] from an [`SafeTensors`] by name.
+///
+/// Tensor is on the cpu and owning.
 pub fn safetensor_to_tensor(
     tensors: &SafeTensors,
     name: &str,
@@ -141,8 +147,7 @@ impl<'a, 'd> nn::StateDictReader for SafetensorReader<'a, 'd> {
     }
 }
 
-//safetensors::tensor::View
-
+/// Adaptor to provide [`safetensors::tensor::View`] for Tensor objects.
 pub struct SafetensorView<'a, T: fp::core_methods::CoreMethods + fp::data::DataRef> {
     t: &'a T,
 }
