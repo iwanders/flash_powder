@@ -4,7 +4,8 @@ resolver = "2"
 members = [
     "torch_stable",
     "flash_powder",
-     "example_vgg"
+    "flash_powder_safetensors",
+    "example_vgg"
 ]
 
 
@@ -12,6 +13,7 @@ members = [
 
 torch_stable = { version = "0.1.0", path = "./torch_stable/"}
 flash_powder = { version = "0.1.0", path = "./flash_powder/"}
+flash_powder_safetensors = { version = "0.1.0", path = "./flash_powder_safetensors/"}
 example_vgg = { version = "0.1.0", path = "./example_vgg/"}
 
 
@@ -22,4 +24,5 @@ anyhow = "1.0.102"
 zerocopy = "0.8.48"
 tinyvec = "1.11.0"
 
-dyn-clone = "1.0.20"
+# Very broad version, such that the consumer can pick it if they want to.
+safetensors = "0"

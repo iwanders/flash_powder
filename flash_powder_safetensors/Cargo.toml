@@ -1,5 +1,5 @@
 [package]
-name = "flash_powder"
+name = "flash_powder_safetensors"
 version = "0.1.0"
 edition = "2024"
 license = "BSD-3-Clause"
@@ -9,21 +9,19 @@ license = "BSD-3-Clause"
 
 [dependencies]
 anyhow = {workspace=true}
-# For byte access into tensor
-zerocopy = {workspace=true}
-torch_stable = {workspace=true, features=[ ]}
-
-# For Shape
-tinyvec = {workspace=true, features=["alloc"]}
+safetensors = {workspace=true}
+flash_powder  = {workspace=true, features=[ ]}
 
 [build-dependencies]
 torch_stable = {workspace=true, features=[ ]}
 
 
-[features]
+
+# We don't actually need these features.
+#[features]
 
 # Version that is being targetted.
-v2_13 = ["torch_stable/v2_13"]
+#v2_13 = ["flash_powder/v2_13"]
 
 # Whether to link against torch_cuda.
-cuda = ["torch_stable/cuda"]
+#cuda = ["flash_powder/cuda"]
