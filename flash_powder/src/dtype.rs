@@ -68,17 +68,33 @@ pub enum DType {
     U64,
     // Weird ones below
     /// 8-bit floating point, S-E-M 1-5-2
+    ///
+    /// This is unprintable.
     F8_e5m2,
     /// 8-bit floating point, S-E-M 1-4-3
+    ///
+    /// This is unprintable.
     F8_e4m3fn,
     /// 8-bit floating point, S-E-M 1-5-2
+    ///
+    /// This is unprintable.
     F8_e5m2fnuz,
     /// 8-bit floating point, S-E-M 1-4-3
+    ///
+    /// This is unprintable.
     F8_e4m3fnuz,
     /// 8-bit floating point, S-E-M 0-8-0
+    ///
+    /// This is unprintable.
     F8_e8m0fnu,
     /// packed 4-bit floating point, S-E-M 1-2-1
+    ///
+    /// This is unprintable.
     F4_e2m1fn_x2,
+    /// BFloat16
+    ///
+    /// This type is unprintable!
+    BF16,
 }
 
 impl From<DType> for ScalarType {
@@ -90,6 +106,7 @@ impl From<DType> for ScalarType {
             DType::I32 => ScalarType::Int,
             DType::I64 => ScalarType::Long,
             DType::F16 => ScalarType::Half,
+            DType::BF16 => ScalarType::BFloat16,
             DType::F32 => ScalarType::Float,
             DType::F64 => ScalarType::Double,
             DType::Complex32 => ScalarType::ComplexHalf,
