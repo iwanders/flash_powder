@@ -51,7 +51,28 @@ pub fn flash_powder_dtype_to_safetensor_dtype(v: fp::DType) -> safetensors::Dtyp
         fp::DType::F16 => safetensors::Dtype::F16,
         fp::DType::F32 => safetensors::Dtype::F32,
         fp::DType::F64 => safetensors::Dtype::F64,
-        _ => todo!(),
+        flash_powder::DType::U8 => todo!(),
+        flash_powder::DType::I8 => todo!(),
+        flash_powder::DType::I16 => todo!(),
+        flash_powder::DType::I32 => safetensors::Dtype::I32,
+        flash_powder::DType::I64 => todo!(),
+        flash_powder::DType::F16 => todo!(),
+        flash_powder::DType::F32 => todo!(),
+        flash_powder::DType::F64 => todo!(),
+        flash_powder::DType::Complex32 => todo!(),
+        flash_powder::DType::Complex64 => todo!(),
+        flash_powder::DType::Complex128 => todo!(),
+        flash_powder::DType::Bool => todo!(),
+        flash_powder::DType::U16 => todo!(),
+        flash_powder::DType::U32 => todo!(),
+        flash_powder::DType::U64 => todo!(),
+        flash_powder::DType::F8_e5m2 => todo!(),
+        flash_powder::DType::F8_e4m3fn => todo!(),
+        flash_powder::DType::F8_e5m2fnuz => todo!(),
+        flash_powder::DType::F8_e4m3fnuz => todo!(),
+        flash_powder::DType::F8_e8m0fnu => todo!(),
+        flash_powder::DType::F4_e2m1fn_x2 => todo!(),
+        flash_powder::DType::BF16 => todo!(),
     }
 }
 
@@ -149,16 +170,16 @@ mod test {
 
         let adapted = conv.tensors();
 
-        let serialized = safetensors::tensor::serialize(
+        let safetensor_bytes = safetensors::tensor::serialize(
             adapted
                 .iter()
                 .map(|(k, v)| (k, SafetensorView::new(*v).unwrap())),
             None,
         )?;
-        assert!(!serialized.is_empty());
+        assert!(!safetensor_bytes.is_empty());
 
         // Super cool, now load our serialized data again.
-        let tensors = safetensors::SafeTensors::deserialize(&serialized)?;
+        let tensors = safetensors::SafeTensors::deserialize(&safetensor_bytes)?;
         let reader = SafetensorReader::from_safetensors(&tensors);
 
         let mut new_conv = fp::nn::Conv2d::new(3, 3, (3, 3), Default::default())?;
@@ -170,6 +191,38 @@ mod test {
                 .unwrap()
                 .equal(new_conv.bias.as_ref().unwrap())?
         );
+
+        Ok(())
+    }
+    #[test]
+    fn test_minimal() -> Result<(), anyhow::Error> {
+        let weight = fp::Tensor::from(&[1])?;
+        let bias = fp::Tensor::from(&[1])?;
+        let conv = fp::nn::Linear {
+            weight,
+            bias: Some(bias),
+        };
+        println!("weight: {conv:?}");
+
+        let adapted = conv.state_dict()?;
+
+        let safetensor_bytes = safetensors::tensor::serialize(
+            adapted
+                .as_map()
+                .iter()
+                .map(|(k, v)| (k, SafetensorView::new(v.as_tensor().unwrap()).unwrap())),
+            None,
+        )?;
+        assert!(!safetensor_bytes.is_empty());
+
+        // Super cool, now load our serialized data again.
+        let tensors = safetensors::SafeTensors::deserialize(&safetensor_bytes)?;
+        let reader = SafetensorReader::from_safetensors(&tensors);
+
+        let mut new_conv = fp::nn::Linear::new(1, 1)?;
+        new_conv.load_state_dict(&reader)?;
+        println!("weight: {new_conv:?}");
+        assert!(conv.weight.equal(&new_conv.weight)?);
 
         Ok(())
     }
