@@ -1,6 +1,6 @@
 //! Retrieve properties like [`sizes`][`TensorProperties::sizes()`] from any [`TensorAccess`].
 
-use crate::{Ten, TenMut, Tensor, TensorAccess, dtype::DType};
+use crate::{dtype::DType, Ten, TenMut, Tensor, TensorAccess};
 use torch_stable::headeronly::core::Layout;
 use torch_stable::stable::device::{Device, DeviceIndex};
 
@@ -55,9 +55,18 @@ pub trait TensorProperties: TensorAccess {
     fn size(&self, dim: usize) -> usize {
         self.get_tensor().size(dim)
     }
+
+    /// Exact same as size, but allows for negative indices.
+    ///
+    /// This follows the python semantics better, but `usize` was chosen to not have to cast lengths all the time.
+    fn isize(&self, dim: isize) -> usize {
+        self.get_tensor().size(dim as usize)
+    }
+
     fn is_defined(&self) -> bool {
         self.get_tensor().defined()
     }
+
     fn element_size(&self) -> usize {
         self.get_tensor().element_size()
     }
@@ -86,3 +95,32 @@ pub trait TensorProperties: TensorAccess {
 impl TensorProperties for Tensor {}
 impl<'a> TensorProperties for Ten<'a> {}
 impl<'a> TensorProperties for TenMut<'a> {}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::prelude::*;
+
+    #[test]
+    fn test_flash_powder_indexing() -> crate::StableTorchResult<()> {
+        /*
+            #|PYTHON
+            d = torch.tensor(list(range(1,13)), dtype=torch.float).reshape([1, 3, 4])
+        */
+
+        let d = Tensor::from(&[[
+            [1.0f32, 2.0, 3.0, 4.0],
+            [5.0, 6.0, 7.0, 8.0],
+            [9.0, 10.0, 11.0, 12.0],
+        ]])?;
+        assert_eq!(d.sizes(), &[1, 3, 4]); // #PYTHON list(d.shape)
+        assert_eq!(d.isize(0), 1); // #PYTHON d.size(0)
+        assert_eq!(d.isize(1), 3); // #PYTHON d.size(1)
+        assert_eq!(d.isize(2), 4); // #PYTHON d.size(2)
+        assert_eq!(d.isize(-1), 4); // #PYTHON d.size(-1)
+        assert_eq!(d.isize(-2), 3); // #PYTHON d.size(-2)
+        assert_eq!(d.isize(-3), 1); // #PYTHON d.size(-3)
+
+        Ok(())
+    }
+}
