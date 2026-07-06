@@ -465,14 +465,23 @@ mod test {
         /*
             #|PYTHON
             z = d[1:3]
-            z[1,2]  = 100.0
         */
 
         let mut z = d.i_mut(1..3)?;
         assert_eq!(z.sizes(), &[2, 4]); // #PYTHON list(z.shape)
         assert_eq!(z.stride(0), 4); // #PYTHON  (z.stride(0))
         assert_eq!(z.f32_ref(&[0, 2])?, &7.0); // #PYTHON z[0, 2].item()
+
+        assert_eq!(z.f32_ref(&[1, 2])?, &11.0); // #PYTHON z[1, 2].item()
+
+        // and then overwrite it.
+        /*
+            #|PYTHON
+            z[1,2]  = 100.0
+        */
+
         *(z.f32_mut(&[1, 2])?) = 100.0;
+        assert_eq!(z.f32_ref(&[1, 2])?, &100.0); // #PYTHON z[1, 2].item()
         assert_eq!(d.f32_ref(&[2, 2])?, &100.0); // #PYTHON d[2, 2].item()
 
         // borrow on borrow.
