@@ -1,0 +1,27 @@
+[package]
+name = "flash_powder_image"
+version = "0.1.0"
+edition = "2024"
+license = "BSD-3-Clause"
+
+[lib]
+#crate-type=["cdylib", "rlib"]
+
+[dependencies]
+anyhow = {workspace=true}
+image = {workspace=true}
+flash_powder  = {workspace=true, features=[ ]}
+
+[build-dependencies]
+torch_stable = {workspace=true, features=[ ]}
+
+
+
+# We don't actually need these features.
+#[features]
+
+# Version that is being targetted.
+#v2_13 = ["flash_powder/v2_13"]
+
+# Whether to link against torch_cuda.
+#cuda = ["flash_powder/cuda"]

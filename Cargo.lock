@@ -333,6 +333,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "flash_powder_image"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "flash_powder",
+ "image",
+ "torch_stable",
+]
+
+[[package]]
 name = "flash_powder_safetensors"
 version = "0.1.0"
 dependencies = [

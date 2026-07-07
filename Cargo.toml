@@ -5,6 +5,7 @@ members = [
     "torch_stable",
     "flash_powder",
     "flash_powder_safetensors",
+    "flash_powder_image",
     "example_vgg"
 ]
 
@@ -25,4 +26,5 @@ zerocopy = "0.8.48"
 tinyvec = "1.11.0"
 
 # Very broad version, such that the consumer can pick it if they want to.
-safetensors = "0"
+safetensors = "*"
+image = "*"
