@@ -197,6 +197,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         let r: Tensor = Tensor::new(stack[0].try_into().unwrap());
         Ok(r)
     }
+
     /// Multiply
     ///
     /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L4377)
@@ -207,6 +208,30 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         unsafe_call_dispatch_panic!("aten::mul", "Tensor", stack.as_mut_slice());
         let r: Tensor = Tensor::new(stack[0].try_into().unwrap());
         Ok(r)
+    }
+
+    /// Add
+    ///
+    /// We can't actually dispatch into the kernel for addition yet, see [my comment](https://github.com/pytorch/pytorch/issues/174507#issuecomment-4150977835)
+    /// about it and the reply on it.
+    ///
+    /// It would be the following kernel: [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L554)
+    ///
+    /// For now, we'll use the direct calls.
+    fn add<T: TensorAccess + TensorProperties>(&self, other: &T) -> StableTorchResult<Tensor> {
+        aoti_torch_add_helper(&self.ten()?, other, 1.0)
+    }
+
+    /// Sub
+    ///
+    /// We can't actually dispatch into the kernel for addition yet, see [my comment](https://github.com/pytorch/pytorch/issues/174507#issuecomment-4150977835)
+    /// about it and the reply on it.
+    ///
+    /// It would be the following kernel: [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L554)
+    ///
+    /// For now, we'll use the direct calls.
+    fn sub<T: TensorAccess + TensorProperties>(&self, other: &T) -> StableTorchResult<Tensor> {
+        aoti_torch_add_helper(&self.ten()?, other, -1.0)
     }
 
     /// Permute
@@ -462,6 +487,50 @@ impl<'a> TenMut<'a> {
 
         Ok(TenMut::new(self.into_parent(), r))
     }
+}
+
+fn aoti_torch_add_helper<A: TensorAccess + TensorProperties, B: TensorAccess + TensorProperties>(
+    a: &A,
+    other: &B,
+    alpha: f64,
+) -> StableTorchResult<Tensor> {
+    let stable_self = a.get_tensor();
+    let stable_other = other.get_tensor();
+
+    if a.device() != other.device() {
+        anyhow::bail!(
+            "operands for add are not on same device ({:?} and {:?})",
+            a.device(),
+            other.device()
+        )
+    }
+    let mut handle_res: AtenTensorHandle = std::ptr::null_mut();
+
+    if a.is_cpu() && other.is_cpu() {
+        unsafe_call_bail!(aoti_torch_cpu_add_Tensor(
+            stable_self.get(),
+            stable_other.get(),
+            alpha,
+            &mut handle_res
+        ));
+    } else if a.is_cuda() && other.is_cuda() {
+        if cfg!(not(feature = "cuda")) {
+            anyhow::bail!("cannot add two cuda tensors without cuda support");
+        }
+        #[cfg(feature = "cuda")]
+        unsafe_call_bail!(aoti_torch_cuda_add_Tensor(
+            stable_self.get(),
+            stable_other.get(),
+            alpha,
+            &mut handle_res
+        ));
+    }
+    if handle_res.is_null() {
+        anyhow::bail!("computation of addition failed");
+    }
+
+    let r: Tensor = Tensor::new(StableTensor::from_handle(handle_res));
+    Ok(r)
 }
 
 #[cfg(test)]
@@ -1004,7 +1073,7 @@ mod test {
         */
         let x2: Tensor = [0.0, 1.0, 0.0].try_into()?;
         let mut x: Tensor = [1.0, 2.0, 3.0].try_into()?;
-        x.i_mut((0..2))?.copy_from_tensor(&x2.i((0..2))?)?;
+        x.i_mut(0..2)?.copy_from_tensor(&x2.i(0..2)?)?;
         assert_eq!(x.f64s_ref()?, &[0.0, 1.0, 3.0]); // #PYTHON x.tolist()
 
         Ok(())
@@ -1037,6 +1106,29 @@ mod test {
                 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0
             ]
         ); // #PYTHON combined.ravel().tolist()
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_addition_subtract() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            x = torch.tensor([1.0, 2.0, 3.0])
+            x2 = torch.tensor([0.0, 1.0, 0.0])
+            added = x + x2
+            sub = x - x2
+        */
+        let x: Tensor = [1.0, 2.0, 3.0].try_into()?;
+        assert_eq!(x.f64s_ref()?, &[1.0, 2.0, 3.0]); // #PYTHON x.tolist()
+        let x2: Tensor = [0.0, 1.0, 0.0].try_into()?;
+        assert_eq!(x2.f64s_ref()?, &[0.0, 1.0, 0.0]); // #PYTHON x2.tolist()
+
+        let added = x.add(&x2)?;
+        assert_eq!(added.f64s_ref()?, &[1.0f64, 3.0, 3.0]); // #PYTHON added.ravel().tolist()
+
+        let sub = x.sub(&x2)?;
+        assert_eq!(sub.f64s_ref()?, &[1.0f64, 1.0, 3.0]); // #PYTHON sub.ravel().tolist()
 
         Ok(())
     }
