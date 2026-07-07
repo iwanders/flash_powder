@@ -69,8 +69,9 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     /// # use flash_powder::prelude::*;
     /// # use flash_powder::{StableTorchResult, Tensor};
     /// # use flash_powder as fp;
-    /// # fn foo() -> StableTorchResult<()>{
-    ///   let t = Tensor::zeros(&[3,3], &fp::DType::U8.into())?;
+    /// # fn foo(t: Tensor) -> StableTorchResult<()>{
+    ///   let as_u8 = t.to(&fp::DType::U8.into())?;
+    ///   let u8_on_cpu = as_u8.to(&fp::Device::CPU.into())?;
     /// # Ok(())
     /// # }
     /// ```

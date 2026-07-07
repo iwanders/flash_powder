@@ -57,6 +57,9 @@ impl_conversion!(MemoryFormat, ToOptions, memory_format);
 
 
 
+/// Options for empty.
+///
+/// The types [`Device`], [`DType`], [`Layout`] and [`MemoryFormat`] implement [`std::convert::From`] for this struct.
 #[derive(Copy, Clone, Debug, Default)]
 pub struct EmptyOptions {
     pub dtype: Option<DType>,
@@ -72,6 +75,8 @@ impl_conversion!(MemoryFormat, EmptyOptions, memory_format);
 
 
 /// Options to create zero tensors.
+///
+/// The types [`Device`], [`DType`], [`Layout`]  implement [`std::convert::From`] for this struct.
 #[derive(Copy, Clone, Debug, Default)]
 pub struct TensorOptions {
     pub dtype: Option<DType>,
@@ -120,6 +125,17 @@ pub trait TensorFactory: TensorAccess + TensorProperties {
     }
     /// A new zeros vector
     ///
+    ///
+    ///
+    /// ```rust
+    /// # use flash_powder::prelude::*;
+    /// # use flash_powder::{StableTorchResult, Tensor};
+    /// # use flash_powder as fp;
+    /// # fn foo() -> StableTorchResult<()>{
+    ///   let t = Tensor::zeros(&[3,3], &fp::DType::U8.into())?;
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L6837)
     /// - [pytorch equivalent](https://docs.pytorch.org/docs/2.11/generated/torch.zeros.html)

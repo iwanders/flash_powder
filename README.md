@@ -47,13 +47,16 @@ assert_eq!(d.i64_ref(&[])?, &5);
 // Or create a 2D Tensor with some floats;
 let d: Tensor = [[5.0f32, 3.0, 5.0], [1.0, 2.0, 0.0]].try_into()?;
 assert_eq!(d.sizes(), &[2, 3]);
+
+let d_as_u8 = d.to(&fp::DType::U8.into())?;
+let u8_on_gpu = as_u8.to(&fp::Device::CUDA.into())?;
 ```
 
-Or any of the [conversion](flash_powder/src/factory.rs) trait methods:
+Or any of the [factory](flash_powder/src/factory.rs) trait methods:
 ```rust
-let a = Tensor::empty(&[5, 5], &Default::default());
-let d = Tensor::randn(&[3, 3], &Default::default())?;
-let d = Tensor::zeros(&[3, 3], &Default::default())?; 
+let a = Tensor::empty(&[5, 5], &Default::default()); // Defaults to cpu, f32
+let t = Tensor::randn(&[3, 3], &fp::Device::CPU.into())?; // We can give it a device to create it on
+let e = Tensor::zeros(&[6, 6], &fp::DType::U8.into())?; // Or specify a type (or mix these options).
 ```
 
 The properties of a tensor, like `dtype()`, `device()` and `sizes()` are all provided by the `TensorProperties` trait from the [properties](flash_powder/src/properties.rs) module.
