@@ -33,6 +33,10 @@ Todo;
     - Add .assign... because currently we can't assign into a Ten with another Ten.
     - Stacking of tensors?
     - Maybe rename .equal to .is_equal? I keep typing the wrong thing.
+    - Remove data_ptr, use const correct flavour everywhere
+    - Narrow mut on tenmut should be into
+    - Use into for self transfer
+    - Swap V and B
 Nice to have:
     - Printing with scientific mode / int mode, see comment in printing.rs
     - Summarized printing without copying the entire tensor to contiguous and cpu, only copy what is printed.

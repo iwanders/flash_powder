@@ -93,7 +93,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         ];
         unsafe_call_dispatch_bail!("aten::to", "dtype_layout", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
-        assert_ne!(self.data_ptr(), r.data_ptr());
+        assert_ne!(self.const_data_ptr(), r.const_data_ptr());
 
         Ok(Tensor::new(r))
     }
@@ -107,7 +107,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), (shape).into()];
         unsafe_call_dispatch_bail!("aten::view", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
-        assert_eq!(self.data_ptr(), r.data_ptr());
+        assert_eq!(self.const_data_ptr(), r.const_data_ptr());
         Ok(Ten::new(self.get_tensor(), r))
     }
 
@@ -218,7 +218,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), dims.into()];
         unsafe_call_dispatch_bail!("aten::permute", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
-        assert_eq!(self.data_ptr(), r.data_ptr());
+        assert_eq!(self.const_data_ptr(), r.const_data_ptr());
         Ok(Ten::new(self.get_tensor(), r))
     }
 
@@ -231,7 +231,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), dim.into()];
         unsafe_call_dispatch_bail!("aten::unsqueeze", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
-        assert_eq!(self.data_ptr(), r.data_ptr());
+        assert_eq!(self.const_data_ptr(), r.const_data_ptr());
         Ok(Ten::new(self.get_tensor(), r))
     }
 
@@ -244,7 +244,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         let mut stack: [StableIValue; 1] = [(self.get_tensor()).into()];
         unsafe_call_dispatch_bail!("aten::squeeze", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
-        assert_eq!(self.data_ptr(), r.data_ptr());
+        assert_eq!(self.const_data_ptr(), r.const_data_ptr());
         Ok(Ten::new(self.get_tensor(), r))
     }
     /// Squeeze
@@ -256,7 +256,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), dim.into()];
         unsafe_call_dispatch_bail!("aten::squeeze", "dim", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
-        assert_eq!(self.data_ptr(), r.data_ptr());
+        assert_eq!(self.const_data_ptr(), r.const_data_ptr());
         Ok(Ten::new(self.get_tensor(), r))
     }
     /// Argmax
@@ -334,7 +334,7 @@ impl<'a> Ten<'a> {
         let mut stack: [StableIValue; 1] = [(self.get_tensor()).into()];
         unsafe_call_dispatch_bail!("aten::squeeze", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
-        assert_eq!(self.data_ptr(), r.data_ptr());
+        assert_eq!(self.const_data_ptr(), r.const_data_ptr());
         Ok(Ten::new(self.as_parent(), r))
     }
 }
@@ -372,7 +372,7 @@ pub trait CoreMethodsMut: TensorAccess + TensorProperties {
         unsafe_call_dispatch_bail!("aten::fill_", "Tensor", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         let retrieve = Tensor::new(r);
-        assert_eq!(retrieve.data_ptr(), self.data_ptr());
+        assert_eq!(retrieve.const_data_ptr(), self.const_data_ptr());
         Ok(())
     }
     fn fill_f64(&mut self, value: f64) -> StableTorchResult<()> {
@@ -390,7 +390,7 @@ pub trait CoreMethodsMut: TensorAccess + TensorProperties {
         let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), (shape).into()];
         unsafe_call_dispatch_bail!("aten::view", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
-        assert_eq!(self.data_ptr(), r.data_ptr());
+        assert_eq!(self.const_data_ptr(), r.const_data_ptr());
         Ok(TenMut::new(self.get_tensor_mut(), r))
     }
 
@@ -399,7 +399,7 @@ pub trait CoreMethodsMut: TensorAccess + TensorProperties {
         let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), (shape).into()];
         unsafe_call_dispatch_bail!("aten::view", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
-        assert_eq!(self.data_ptr(), r.data_ptr());
+        assert_eq!(self.const_data_ptr(), r.const_data_ptr());
         Ok(TenMut::new(self.get_tensor_mut(), r))
     }
 
@@ -412,7 +412,7 @@ pub trait CoreMethodsMut: TensorAccess + TensorProperties {
         let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), dims.into()];
         unsafe_call_dispatch_bail!("aten::permute", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
-        assert_eq!(self.data_ptr(), r.data_ptr());
+        assert_eq!(self.const_data_ptr(), r.const_data_ptr());
         Ok(TenMut::new(self.get_tensor_mut(), r))
     }
 
@@ -424,7 +424,7 @@ pub trait CoreMethodsMut: TensorAccess + TensorProperties {
         let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), t.get_tensor().into()];
         unsafe_call_dispatch_bail!("aten::copy_", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
-        assert_eq!(self.data_ptr(), r.data_ptr());
+        assert_eq!(self.const_data_ptr(), r.const_data_ptr());
         Ok(())
     }
 }

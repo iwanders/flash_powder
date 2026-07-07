@@ -275,7 +275,6 @@ mod test {
         let mut a = Tensor::from_f32(5.0)?.unsqueeze(0)?;
         println!("a.element_size(): {:?}", a.element_size());
         println!("a.scalar_type(): {:?}", a.scalar_type());
-        println!("a.data_ptr: {:?}", a.data_ptr());
         println!("a.const_data_ptr: {:?}", a.const_data_ptr());
         println!("a.mutable_data_ptr: {:?}", a.mutable_data_ptr());
         println!("a.data_mut(): {:?}", a.data_mut()?);
@@ -311,7 +310,7 @@ mod test {
                 ..Default::default()
             },
         )?;
-        println!("t.data_ptr: {:?}", t.data_ptr());
+        println!("t.data_ptr: {:?}", t.const_data_ptr());
         println!("t.f32_ref(): {:?}", t.f32_ref()?);
         let s = t.f32_ref()?;
         assert_eq!(s, &[0.0, 0.0, 0.0, 0.0]);
@@ -329,7 +328,6 @@ mod test {
                 ..Default::default()
             },
         )?;
-        println!("t.data_ptr: {:?}", t.data_ptr());
         println!("t.const_data_ptr: {:?}", t.const_data_ptr());
         println!("t.mutable_data_ptr: {:?}", t.mutable_data_ptr());
         // println!("t.f32_ref(): {:?}", t.f32_ref()?); yes this is unitialised, lets not look at it as valgrind lights up.

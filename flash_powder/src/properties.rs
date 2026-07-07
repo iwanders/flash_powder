@@ -80,9 +80,9 @@ pub trait TensorProperties: TensorAccess {
         self.get_tensor().storage_offset()
     }
 
-    fn data_ptr(&self) -> *const u8 {
-        self.get_tensor().data_ptr()
-    }
+    // fn data_ptr(&self) -> *const u8 {
+    //     self.get_tensor().data_ptr()
+    // }
 
     fn const_data_ptr(&self) -> *const u8 {
         self.get_tensor().const_data_ptr()

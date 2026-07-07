@@ -165,14 +165,17 @@ impl Tensor {
     }
 
     // What's the deal with the three below? Does the first one not have the storage_offset()?
+    // IW, later insight, the first is from aoti_torch and performs a copy if it is a view.
+    // So effectively the semantics of that function differ based on the data behind it.
 
     // https://github.com/pytorch/pytorch/blob/v2.11.0/torch/csrc/stable/tensor_struct.h#L126
     // Actually a void pointer, but lets keep this sort of convenient.
-    pub fn data_ptr(&self) -> *mut u8 {
-        let mut data_ptr: *mut libc::c_void = std::ptr::null_mut();
-        unsafe_call_panic!(aoti_torch_get_data_ptr(self.get(), &mut data_ptr));
-        data_ptr.cast::<u8>()
-    }
+    // pub fn data_ptr(&self) -> *mut u8 {
+    //     let mut data_ptr: *mut libc::c_void = std::ptr::null_mut();
+    //     unsafe_call_panic!(aoti_torch_get_data_ptr(self.get(), &mut data_ptr));
+    //     data_ptr.cast::<u8>()
+    // }
+
     // https://github.com/pytorch/pytorch/blob/v2.11.0/torch/csrc/stable/tensor_struct.h#L140
     // Actually a void pointer, but lets keep this sort of convenient.
     pub fn mutable_data_ptr(&mut self) -> *mut u8 {

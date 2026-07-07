@@ -65,7 +65,7 @@ pub trait DataRef: TensorAccess + TensorProperties {
 
         let z = self.get_tensor();
         // https://github.com/pytorch/pytorch/blob/ec673ecd/c10/core/TensorImpl.h#L743-L756
-        let data_ptr = z.data_ptr();
+        let data_ptr = z.const_data_ptr();
         if z.is_cpu() {
             Ok(unsafe { std::slice::from_raw_parts(data_ptr, z.storage_size()) })
         } else {
@@ -232,7 +232,7 @@ pub trait DataMut: TensorAccess + TensorProperties {
         }
         let z = self.get_tensor_mut();
         // https://github.com/pytorch/pytorch/blob/ec673ecd/c10/core/TensorImpl.h#L743-L756
-        let data_ptr = z.data_ptr();
+        let data_ptr = z.mutable_data_ptr();
         if z.is_cpu() {
             Ok(unsafe { std::slice::from_raw_parts_mut(data_ptr, z.storage_size()) })
         } else {

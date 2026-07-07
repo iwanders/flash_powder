@@ -155,7 +155,7 @@ pub fn relu<T: TensorAccess>(input: &T) -> StableTorchResult<Tensor> {
     let mut stack: [StableIValue; 1] = [input.get_tensor().into()];
     unsafe_call_dispatch_bail!("aten::relu", "", stack.as_mut_slice());
     let r: StableTensor = stack[0].try_into()?;
-    assert_ne!(input.get_tensor().data_ptr(), r.data_ptr());
+    assert_ne!(input.get_tensor().const_data_ptr(), r.const_data_ptr());
 
     Ok(Tensor::new(r))
 }

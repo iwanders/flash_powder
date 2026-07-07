@@ -48,11 +48,12 @@ assert_eq!(d.i64_ref(&[])?, &5);
 let d: Tensor = [[5.0f32, 3.0, 5.0], [1.0, 2.0, 0.0]].try_into()?;
 assert_eq!(d.sizes(), &[2, 3]);
 
+// Change it or move it to a device
 let d_as_u8 = d.to(&fp::DType::U8.into())?;
 let u8_on_gpu = as_u8.to(&fp::Device::CUDA.into())?;
 ```
 
-Or any of the [factory](flash_powder/src/factory.rs) trait methods:
+Or create them with any of the [factory](flash_powder/src/factory.rs) trait methods:
 ```rust
 let a = Tensor::empty(&[5, 5], &Default::default()); // Defaults to cpu, f32
 let t = Tensor::randn(&[3, 3], &fp::Device::CPU.into())?; // We can give it a device to create it on
