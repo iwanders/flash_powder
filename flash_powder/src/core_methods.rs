@@ -437,7 +437,7 @@ impl<'a> TenMut<'a> {
     ///
     /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L4489)
     /// - [pytorch equivalent](https://docs.pytorch.org/docs/2.11/generated/torch.Tensor.narrow.html)
-    pub fn narrow_mut(
+    pub fn into_narrow_mut(
         self,
         dim: usize,
         start: isize,
@@ -455,7 +455,7 @@ impl<'a> TenMut<'a> {
         Ok(TenMut::new(self.into_parent(), stack[0].try_into()?))
     }
 
-    pub fn select_mut(self, dim: usize, index: usize) -> StableTorchResult<TenMut<'a>> {
+    pub fn into_select_mut(self, dim: usize, index: usize) -> StableTorchResult<TenMut<'a>> {
         let mut stack: [StableIValue; 3] = [self.get_tensor().into(), dim.into(), index.into()];
         unsafe_call_dispatch_bail!("aten::select", "int", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;

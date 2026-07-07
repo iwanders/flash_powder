@@ -247,7 +247,7 @@ trait TensorIndexWorkerMut: CoreMethodsMut + CoreMethods {
                     if DEBUG {
                         println!("Before select shape: {:?}", current.shape());
                     }
-                    current = current.select_mut(current_dim, *index as usize)?;
+                    current = current.into_select_mut(current_dim, *index as usize)?;
                     // current = current.narrow(current_dim, *index, 1)?.into_squeeze()?;
                     if DEBUG {
                         println!("After select shape: {:?}", current.shape());
@@ -261,12 +261,12 @@ trait TensorIndexWorkerMut: CoreMethodsMut + CoreMethods {
                     } else {
                         range.len()
                     };
-                    current = current.narrow_mut(current_dim, range.start, length)?;
+                    current = current.into_narrow_mut(current_dim, range.start, length)?;
                     current_dim += 1;
                     source_dim += 1;
                 }
                 TensorIndexOptions::RangeFull => {
-                    current = current.narrow_mut(current_dim, 0, shape[source_dim])?;
+                    current = current.into_narrow_mut(current_dim, 0, shape[source_dim])?;
                     current_dim += 1;
                     source_dim += 1;
                 }
