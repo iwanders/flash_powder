@@ -209,15 +209,17 @@ impl TensorFromImage for Tensor {
     fn from_dynamic_image(img: image::DynamicImage) -> StableTorchResult<Tensor> {
         let color = img.color();
         let channels = color.channel_count() as usize;
-        let bits_per_pixel = color.bits_per_pixel();
+        let bytes_per_pixel = color.bytes_per_pixel() as usize;
         let width = img.width() as usize;
         let height = img.height() as usize;
 
-        let dtype = match bits_per_pixel {
-            8 => fp::DType::U8,
-            16 => fp::DType::U16,
-            32 => fp::DType::F32, // An image buffer for 32-bit float RGB pixels
-            _ => bail!("unhandled bits per pixel: {bits_per_pixel}, expected 8, 16 or 32"),
+        let dtype = match bytes_per_pixel / channels {
+            1 => fp::DType::U8,
+            2 => fp::DType::U16,
+            4 => fp::DType::F32, // An image buffer for 32-bit float RGB pixels
+            _ => bail!(
+                "unhandled input bytes_per_pixel {bytes_per_pixel} / channels {channels} should be  1, 2 or 4"
+            ),
         };
 
         // Create an empty tensor.
@@ -256,6 +258,7 @@ mod test {
     #[test]
     fn test_write_image() -> StableTorchResult<()> {
         let u8_255: Tensor = 255u8.try_into()?;
+        let f32_255: Tensor = 255.0f32.try_into()?;
         let u16_255: Tensor = 255u16.try_into()?;
 
         // Float, 6 by 6 pixel of greyscale, top left quadrant set to white.
@@ -275,6 +278,8 @@ mod test {
             image::ImageReader::open(&"/tmp/fp_greyscale_u8.png")?.decode()?,
             image::DynamicImage::ImageLuma8(_)
         ));
+        let v = Tensor::read_image("/tmp/fp_greyscale_u8.png")?.to(&fp::DType::U8.into())?;
+        assert!(d.unsqueeze(0)?.equal(&v)?);
 
         // U16, 6 by 6 pixel of greyscale, top left quadrant set to white.
         let mut d = Tensor::zeros(&[6, 6], &fp::DType::U16.into())?;
@@ -284,6 +289,8 @@ mod test {
             image::ImageReader::open(&"/tmp/fp_greyscale_u16.png")?.decode()?,
             image::DynamicImage::ImageLuma8(_)
         ));
+        let v = Tensor::read_image("/tmp/fp_greyscale_u16.png")?.to(&fp::DType::U16.into())?;
+        assert!(d.unsqueeze(0)?.equal(&v)?);
 
         // Test an RGB image.
         let mut d = Tensor::zeros(&[3, 6, 6], &Default::default())?;
@@ -300,6 +307,10 @@ mod test {
             image::ImageReader::open(&"/tmp/fp_rgb_f32.png")?.decode()?,
             image::DynamicImage::ImageRgb8(_)
         ));
+        let v = Tensor::read_image("/tmp/fp_rgb_f32.png")?
+            .to(&fp::DType::F32.into())?
+            .div(&f32_255)?;
+        assert!(d.equal(&v)?);
 
         // Test an rgba image.
         let mut d = Tensor::zeros(&[4, 6, 6], &Default::default())?;
@@ -318,15 +329,10 @@ mod test {
             image::ImageReader::open(&"/tmp/fp_rgba_f32.png")?.decode()?,
             image::DynamicImage::ImageRgba8(_)
         ));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_read_image() -> StableTorchResult<()> {
-        // let d = Tensor::from_dynamic_image("image.png").unwrap();
-
-        // d.read_image("image.png").unwrap();
+        let v = Tensor::read_image("/tmp/fp_rgba_f32.png")?
+            .to(&fp::DType::F32.into())?
+            .div(&f32_255)?;
+        assert!(d.equal(&v)?);
 
         Ok(())
     }
