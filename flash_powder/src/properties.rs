@@ -1,6 +1,6 @@
 //! Retrieve properties like [`sizes`][`TensorProperties::sizes()`] from any [`TensorAccess`].
 
-use crate::{dtype::DType, Ten, TenMut, Tensor, TensorAccess};
+use crate::{Ten, TenMut, Tensor, TensorAccess, dtype::DType};
 use torch_stable::headeronly::core::Layout;
 use torch_stable::stable::device::{Device, DeviceIndex};
 
@@ -99,7 +99,6 @@ impl<'a> TensorProperties for TenMut<'a> {}
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::prelude::*;
 
     #[test]
     fn test_flash_powder_indexing() -> crate::StableTorchResult<()> {

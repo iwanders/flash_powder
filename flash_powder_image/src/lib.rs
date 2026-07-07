@@ -10,7 +10,7 @@ pub use image;
 
 use fp::StableTorchResult;
 
-pub trait TensorImage {
+pub trait TensorToImage {
     /// Save this tensor as an image.
     ///
     /// Semantics are based on size and data type, for greyscale it requires an explicit channel dimension to ensure it
@@ -73,7 +73,7 @@ fn get_info(d: fp::DType) -> DTypeInfo {
     }
 }
 
-impl<T> TensorImage for T
+impl<T> TensorToImage for T
 where
     T: TensorProperties + DataRef + CoreMethods,
 {
@@ -133,10 +133,12 @@ where
         let image_per_row = if v.dim() > 3 { v.isize(-4) } else { 1 };
         let image_rows = if v.dim() == 5 { v.isize(-5) } else { 1 };
 
+        if image_per_row != 1 || image_rows != 1 {
+            dbg!(" need to do some work to correctly support this! ");
+        }
+
         let info = get_info(v.dtype());
-        println!(
-            "info: {info:?}: {image_per_row}, {image_rows}, w: {image_width}, h: {image_height}"
-        );
+
         let v = if info.is_float {
             // Lets do this calculation in F32 space to be precise?
             let vf32 = v.to(&fp::DType::F32.into())?;
@@ -196,6 +198,7 @@ pub trait TensorFromImage {
     /// Like [decode_image](https://docs.pytorch.org/vision/main/generated/torchvision.io.decode_image.html#torchvision.io.decode_image)
     ///
     /// The values of the output tensor are in uint8 in [0, 255] for most cases.
+    ///
     /// output (Tensor[image_channels, image_height, image_width])
     fn from_dynamic_image(dynamic_image: image::DynamicImage) -> StableTorchResult<Tensor>;
 
@@ -333,6 +336,12 @@ mod test {
             .to(&fp::DType::F32.into())?
             .div(&f32_255)?;
         assert!(d.equal(&v)?);
+
+        let mut d = Tensor::zeros(&[2, 3, 6, 6], &Default::default())?;
+        d.i_mut((0, 0, 0..6, 0..6))?.fill_f64(1.0)?; // first image in batch red
+        d.i_mut((1, 2, 0..6, 0..6))?.fill_f64(1.0)?; // second image in batch blue.
+        d.save_image("/tmp/fp_rgb_b2.png").unwrap();
+        // This doesn't work yet... we need to do this image-by image.
 
         Ok(())
     }
