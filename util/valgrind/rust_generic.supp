@@ -32,3 +32,22 @@
    ...
    fun:test_main_with_exit_callback<test::test_main::{closure_env#0}>
 }
+
+# This one is new... manually added.
+{
+   suppression:rust@rt_lang_start_internal_console_thread_rust_1_96
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   fun:_RNvMs_NtNtCs75vJTIYSa2J_3std6thread6threadNtB4_6Thread3new
+   fun:_RNvNtNtCs75vJTIYSa2J_3std6thread7current12init_current
+   fun:_RNvMNtNtNtCs75vJTIYSa2J_3std4sync4mpmc7contextNtB2_7Context3new
+   fun:_RINvMs0_NtNtNtNtCs75vJTIYSa2J_3std3sys12thread_local6native4lazyINtB6_7StorageINtNtCs27Vx93FoQ6z_4core4cell4CellINtNtB1j_6option6OptionNtNtNtNtBe_4sync4mpmc7context7ContextEEuE16get_or_init_slowNvNvNvMB2b_B29_4with7CONTEXT27___rust_std_internal_init_fnECs7Gciw6hfIAV_4test
+   fun:_RNvMs1_NtNtNtCs75vJTIYSa2J_3std4sync4mpmc4listINtB5_7ChannelNtNtCs7Gciw6hfIAV_4test5event13CompletedTestE4recvB10_
+   fun:_RNvNtCs7Gciw6hfIAV_4test7console17run_tests_console
+   fun:_RNvCs7Gciw6hfIAV_4test9test_main
+   fun:_RNvCs7Gciw6hfIAV_4test16test_main_static
+   fun:_ZN3std3sys9backtrace28__rust_begin_short_backtrace17hb78de2d8310f5f42E
+   fun:_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h0c95b98f92d7df39E.llvm.14453573426000481392
+   fun:_RNvNtCs75vJTIYSa2J_3std2rt19lang_start_internal
+}

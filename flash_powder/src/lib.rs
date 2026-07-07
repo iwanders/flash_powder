@@ -33,7 +33,6 @@ Todo;
     - Add .assign... because currently we can't assign into a Ten with another Ten.
     - Stacking of tensors?
     - Maybe rename .equal to .is_equal? I keep typing the wrong thing.
-    - Remove data_ptr, use const correct flavour everywhere
     - Narrow mut on tenmut should be into
     - Use into for self transfer
     - Swap V and B
