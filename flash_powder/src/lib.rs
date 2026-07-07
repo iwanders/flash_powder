@@ -30,10 +30,7 @@ Todo;
     - Figure out how do we want to do overloads??? SHould it take input arguments?
         Example is squeeze_dim; https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L5856
     - Add add, sub, lol.
-    - Add .assign... because currently we can't assign into a Ten with another Ten.
     - Stacking of tensors?
-    - Maybe rename .equal to .is_equal? I keep typing the wrong thing.
-    - Narrow mut on tenmut should be into
     - Use into for self transfer
     - Swap V and B
 Nice to have:

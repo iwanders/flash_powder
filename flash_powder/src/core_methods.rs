@@ -416,11 +416,11 @@ pub trait CoreMethodsMut: TensorAccess + TensorProperties {
         Ok(TenMut::new(self.get_tensor_mut(), r))
     }
 
-    /// Copies the elements from src into self tensor and returns self.
+    /// Assign (.copy_); copies the elements from src into self tensor and returns self.
     ///
     /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L1808)
     /// - [tensor method](https://docs.pytorch.org/docs/2.12/generated/torch.Tensor.copy_.html)
-    fn copy_<T: TensorAccess>(&mut self, t: &T) -> StableTorchResult<()> {
+    fn copy_from_tensor<T: TensorAccess>(&mut self, t: &T) -> StableTorchResult<()> {
         let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), t.get_tensor().into()];
         unsafe_call_dispatch_bail!("aten::copy_", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
@@ -992,8 +992,20 @@ mod test {
             #|PYTHON
             x.copy_(x2)
         */
-        x.copy_(&x2)?;
+        x.copy_from_tensor(&x2)?;
         assert_eq!(x.f64s_ref()?, &[0.0, 1.0, 0.0]); // #PYTHON x.tolist()
+
+        // Can this assign into a view?
+        /*
+            #|PYTHON
+            x = torch.tensor([1.0, 2.0, 3.0])
+            x2 = torch.tensor([0.0, 1.0, 0.0])
+            x[0:2].copy_(x2[0:2])
+        */
+        let x2: Tensor = [0.0, 1.0, 0.0].try_into()?;
+        let mut x: Tensor = [1.0, 2.0, 3.0].try_into()?;
+        x.i_mut((0..2))?.copy_from_tensor(&x2.i((0..2))?)?;
+        assert_eq!(x.f64s_ref()?, &[0.0, 1.0, 3.0]); // #PYTHON x.tolist()
 
         Ok(())
     }
