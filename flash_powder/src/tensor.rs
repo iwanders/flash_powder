@@ -131,9 +131,27 @@ impl TensorAccess for &Tensor {
     fn get_tensor(&self) -> &StableTensor {
         &self.tensor
     }
+    // This here is a mutable reference but an immutable tensor :<
     fn get_tensor_mut(&mut self) -> &mut StableTensor {
         unreachable!(
             "this is here because I didn't split out TensorAccess in mut and non mut... this should never be called"
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::Tensor;
+
+    #[test]
+    fn test_flash_powder_torch_select() -> StableTorchResult<()> {
+        let a: Tensor = 3.try_into()?;
+        let mut b: &Tensor = &a;
+
+        // Bah, this actually compiles :<
+        //let m = b.get_tensor_mut();
+
+        Ok(())
     }
 }
