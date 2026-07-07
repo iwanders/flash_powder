@@ -61,10 +61,23 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         Ok(Ten::new(self.get_tensor(), stack[0].try_into()?))
     }
 
-    /// To
+    /// Conver the tensor to another tensor, returning an owning copy.
+    ///
+    /// The [`ToOptions`] struct can be created through `.into()` conversion, so the following works to create a tensor of U8s.
+    ///
+    /// ```rust
+    /// # use flash_powder::prelude::*;
+    /// # use flash_powder::{StableTorchResult, Tensor};
+    /// # use flash_powder as fp;
+    /// # fn foo() -> StableTorchResult<()>{
+    ///   let t = Tensor::zeros(&[3,3], &fp::DType::U8.into())?;
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L8033)
     /// - [pytorch equivalent](https://docs.pytorch.org/docs/2.11/generated/torch.Tensor.to.html)
+    ///
     fn to(&self, options: &ToOptions) -> StableTorchResult<Tensor> {
         const MAKE_COPY: bool = true;
         let mut stack: [StableIValue; 8] = [
@@ -268,7 +281,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     ///
     ///
     /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L3092-L3102)
-    /// - pytorch method... I'm not actually sure :< it's just self[indices], but not sure to what that maps.
+    /// - pytorch method... I'm not actually sure :< it's just self\[indices\], but not sure to what that maps.
     fn index_tensor<T: TensorAccess>(&self, indices: &[T]) -> StableTorchResult<Tensor> {
         // func: index.Tensor(Tensor self, Tensor?[] indices) -> Tensor
         let indices: Vec<Option<&StableTensor>> =

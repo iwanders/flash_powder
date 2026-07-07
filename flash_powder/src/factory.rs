@@ -14,6 +14,21 @@ use torch_stable::{
 
 
 /// Options for the `to` operation.
+///
+/// The types [`Device`], [`DType`], [`Layout`] and [`MemoryFormat`] implement [`std::convert::From`] for this struct.
+///
+/// This means that you can do:
+/// ```rust
+/// # use flash_powder::prelude::*;
+/// # use flash_powder::{StableTorchResult, Tensor};
+/// # use flash_powder as fp;
+/// # fn foo() -> StableTorchResult<()>{
+///   let t = Tensor::zeros(&[3,3], &fp::DType::U8.into())?;
+/// # Ok(())
+/// # }
+/// ```
+/// If you want to populate two fields at the same time you still need to create the struct manually.
+
 #[derive(Copy, Clone, Debug, Default)]
 pub struct ToOptions {
     pub dtype: Option<DType>,

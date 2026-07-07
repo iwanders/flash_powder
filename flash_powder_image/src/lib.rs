@@ -29,7 +29,7 @@ pub trait TensorToImage {
     /// The interleaved flavour (`[H, W, 3]`) is not handled, neither are 2 channel images.
     ///
     /// All integer types are expected to fit within a byte [0, 255]. All (supported) float types in [0.0, 1.0].
-    /// All images are exported as [0,255] u8.
+    /// All images are exported as [0, 255] u8.
     ///
     /// The pytorch side only accepts (B x C x H x W), with an argument to specify number per row, this function puts
     /// the B dimension always on the same row, but you can do  (V x B x C x H x W), where V is stacking rows.
