@@ -1,8 +1,6 @@
 //! This holds functions that pytorch puts into the torch module.
 //!
-//! This module is a bit sad atm... it holds select, but it not ever used because I needed specific selects in each
-//! of the three principal types.
-use crate::tensor::{Ten, TensorAccess};
+use crate::tensor::{Ten, Tensor, TensorAccess};
 use torch_stable::{
     StableTorchResult, aoti_torch::StableIValue, stable::tensor::Tensor as StableTensor,
     unsafe_call_dispatch_bail,
@@ -10,7 +8,7 @@ use torch_stable::{
 
 /// Select an index in a dimension
 ///
-/// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L5391)
+/// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L5898-L5922)
 /// - [pytorch equivalent](https://docs.pytorch.org/docs/2.12/generated/torch.select.html)
 pub fn select<T: TensorAccess>(input: &T, dim: usize, index: usize) -> StableTorchResult<Ten<'_>> {
     let mut stack: [StableIValue; 3] = [input.get_tensor().into(), dim.into(), index.into()];
@@ -18,6 +16,53 @@ pub fn select<T: TensorAccess>(input: &T, dim: usize, index: usize) -> StableTor
     let r: StableTensor = stack[0].try_into()?;
 
     Ok(Ten::new(input.get_tensor(), r))
+}
+
+/// Concatenates a sequence of tensors along a new dimension.
+///
+/// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L5932)
+/// - [pytorch_equivalent](https://docs.pytorch.org/docs/2.12/generated/torch.stack.html)
+pub fn stack<T: TensorAccess>(tensors: &[T], dim: usize) -> StableTorchResult<Tensor> {
+    let tensor_list: Vec<StableIValue> = tensors.iter().map(|z| z.get_tensor().into()).collect();
+    let mut stack: [StableIValue; 2] = [(&tensor_list[..]).into(), dim.into()];
+    unsafe_call_dispatch_bail!("aten::stack", "", stack.as_mut_slice());
+    let r: StableTensor = stack[0].try_into()?;
+    Ok(Tensor::new(r))
+}
+
+/// Stack tensors in sequence horizontally (column wise).
+///
+/// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L5898-L5922)
+/// - [pytorch_equivalent](https://docs.pytorch.org/docs/2.12/generated/torch.hstack.html)
+pub fn hstack<T: TensorAccess>(tensors: &[T]) -> StableTorchResult<Tensor> {
+    let tensor_list: Vec<StableIValue> = tensors.iter().map(|z| z.get_tensor().into()).collect();
+    let mut stack: [StableIValue; 1] = [(&tensor_list[..]).into()];
+    unsafe_call_dispatch_bail!("aten::hstack", "", stack.as_mut_slice());
+    let r: StableTensor = stack[0].try_into()?;
+    Ok(Tensor::new(r))
+}
+
+/// Stack tensors in sequence vertically (row wise).
+///
+/// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L5954)
+/// - [pytorch_equivalent](https://docs.pytorch.org/docs/2.12/generated/torch.vstack.html)
+pub fn vstack<T: TensorAccess>(tensors: &[T]) -> StableTorchResult<Tensor> {
+    let tensor_list: Vec<StableIValue> = tensors.iter().map(|z| z.get_tensor().into()).collect();
+    let mut stack: [StableIValue; 1] = [(&tensor_list[..]).into()];
+    unsafe_call_dispatch_bail!("aten::vstack", "", stack.as_mut_slice());
+    let r: StableTensor = stack[0].try_into()?;
+    Ok(Tensor::new(r))
+}
+/// Stack tensors in sequence depthwise (along third axis).
+///
+/// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L5898-L5922)
+/// - [pytorch_equivalent](https://docs.pytorch.org/docs/2.12/generated/torch.dstack.html)
+pub fn dstack<T: TensorAccess>(tensors: &[T]) -> StableTorchResult<Tensor> {
+    let tensor_list: Vec<StableIValue> = tensors.iter().map(|z| z.get_tensor().into()).collect();
+    let mut stack: [StableIValue; 1] = [(&tensor_list[..]).into()];
+    unsafe_call_dispatch_bail!("aten::dstack", "", stack.as_mut_slice());
+    let r: StableTensor = stack[0].try_into()?;
+    Ok(Tensor::new(r))
 }
 
 pub mod cuda {
@@ -79,6 +124,81 @@ mod test {
         assert_eq!(c.i(2)?.as_f32()?, &11.0); // #PYTHON c[ 2].item()
         assert_eq!(c.i(3)?.as_f32()?, &15.0); // #PYTHON c[ 3].item()
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_torch_vstack() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            a = torch.tensor([1, 2, 3])
+            b = torch.tensor([4, 5, 6])
+            s = torch.vstack((a,b))
+        */
+        let a: Tensor = [1, 2, 3].try_into()?;
+        let b: Tensor = [4, 5, 6].try_into()?;
+
+        let s = vstack(&[a, b])?;
+        assert_eq!(s.sizes(), &[2, 3]); // #PYTHON list(s.shape)
+        assert_eq!(s.i32s_ref()?, &[1, 2, 3, 4, 5, 6]); // #PYTHON list(s.view(-1).tolist())
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_torch_hstack() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            a = torch.tensor([1, 2, 3])
+            b = torch.tensor([4, 5, 6])
+            s = torch.hstack((a,b))
+        */
+        let a: Tensor = [1, 2, 3].try_into()?;
+        let b: Tensor = [4, 5, 6].try_into()?;
+
+        let s = hstack(&[a, b])?;
+        assert_eq!(s.sizes(), &[6]); // #PYTHON list(s.shape)
+        assert_eq!(s.i32s_ref()?, &[1, 2, 3, 4, 5, 6]); // #PYTHON list(s.view(-1).tolist())
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_torch_dstack() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            a = torch.tensor([1, 2, 3])
+            b = torch.tensor([4, 5, 6])
+            s = torch.dstack((a,b))
+        */
+        let a: Tensor = [1, 2, 3].try_into()?;
+        let b: Tensor = [4, 5, 6].try_into()?;
+
+        let s = dstack(&[a, b])?;
+        assert_eq!(s.sizes(), &[1, 3, 2]); // #PYTHON list(s.shape)
+        assert_eq!(s.i32s_ref()?, &[1, 4, 2, 5, 3, 6]); // #PYTHON list(s.view(-1).tolist())
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_torch_stack() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            x = torch.randn(2, 3)
+            xx = torch.stack((x,x)) # same as torch.stack((x, x), dim=0)
+            xx1 = torch.stack((x, x), dim=1)
+            xx2 = torch.stack((x, x), dim=2)
+        */
+        let x: Tensor = Tensor::randn(&[2, 3], &Default::default())?;
+
+        let xx = stack(&[&x, &x], 0)?;
+        assert_eq!(xx.sizes(), &[2, 2, 3]); // #PYTHON list(xx.shape)
+
+        let xx1 = stack(&[&x, &x], 1)?;
+        assert_eq!(xx1.sizes(), &[2, 2, 3]); // #PYTHON list(xx1.shape)
+
+        let xx2 = stack(&[&x, &x], 2)?;
+        assert_eq!(xx2.sizes(), &[2, 3, 2]); // #PYTHON list(xx2.shape)
+
+        // And there's -1, but our dim is signed atm.
         Ok(())
     }
 }

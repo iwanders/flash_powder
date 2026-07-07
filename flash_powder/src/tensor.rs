@@ -126,3 +126,14 @@ impl TensorAccess for Tensor {
         &mut self.tensor
     }
 }
+
+impl TensorAccess for &Tensor {
+    fn get_tensor(&self) -> &StableTensor {
+        &self.tensor
+    }
+    fn get_tensor_mut(&mut self) -> &mut StableTensor {
+        unreachable!(
+            "this is here because I didn't split out TensorAccess in mut and non mut... this should never be called"
+        )
+    }
+}
