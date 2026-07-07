@@ -25,7 +25,7 @@
 //!     let mut new_linear = fp::nn::Linear::new_without_bias(1, 1)?;
 //!     // Read into its tensors.
 //!     new_linear.load_state_dict(&reader)?;
-//!     assert!(new_linear.weight.equal(&fp::Tensor::from(&[3.3])?)?);
+//!     assert!(new_linear.weight.is_equal(&fp::Tensor::from(&[3.3])?)?);
 //!
 //!#    Ok(())
 //!# }
@@ -209,12 +209,12 @@ mod test {
 
         let mut new_conv = fp::nn::Conv2d::new(3, 3, (3, 3), Default::default())?;
         new_conv.load_state_dict(&reader)?;
-        assert!(conv.weight.equal(&new_conv.weight)?);
+        assert!(conv.weight.is_equal(&new_conv.weight)?);
         assert!(
             conv.bias
                 .as_ref()
                 .unwrap()
-                .equal(new_conv.bias.as_ref().unwrap())?
+                .is_equal(new_conv.bias.as_ref().unwrap())?
         );
 
         Ok(())
@@ -234,7 +234,7 @@ mod test {
         let mut new_linear = fp::nn::Linear::new_without_bias(1, 1)?;
         // Read into its tensors.
         new_linear.load_state_dict(&reader)?;
-        assert!(new_linear.weight.equal(&fp::Tensor::from(&[3.3])?)?);
+        assert!(new_linear.weight.is_equal(&fp::Tensor::from(&[3.3])?)?);
 
         Ok(())
     }

@@ -282,7 +282,7 @@ mod test {
             image::DynamicImage::ImageLuma8(_)
         ));
         let v = Tensor::read_image("/tmp/fp_greyscale_u8.png")?.to(&fp::DType::U8.into())?;
-        assert!(d.unsqueeze(0)?.equal(&v)?);
+        assert!(d.unsqueeze(0)?.is_equal(&v)?);
 
         // U16, 6 by 6 pixel of greyscale, top left quadrant set to white.
         let mut d = Tensor::zeros(&[6, 6], &fp::DType::U16.into())?;
@@ -293,7 +293,7 @@ mod test {
             image::DynamicImage::ImageLuma8(_)
         ));
         let v = Tensor::read_image("/tmp/fp_greyscale_u16.png")?.to(&fp::DType::U16.into())?;
-        assert!(d.unsqueeze(0)?.equal(&v)?);
+        assert!(d.unsqueeze(0)?.is_equal(&v)?);
 
         // Test an RGB image.
         let mut d = Tensor::zeros(&[3, 6, 6], &Default::default())?;
@@ -313,7 +313,7 @@ mod test {
         let v = Tensor::read_image("/tmp/fp_rgb_f32.png")?
             .to(&fp::DType::F32.into())?
             .div(&f32_255)?;
-        assert!(d.equal(&v)?);
+        assert!(d.is_equal(&v)?);
 
         // Test an rgba image.
         let mut d = Tensor::zeros(&[4, 6, 6], &Default::default())?;
@@ -335,7 +335,7 @@ mod test {
         let v = Tensor::read_image("/tmp/fp_rgba_f32.png")?
             .to(&fp::DType::F32.into())?
             .div(&f32_255)?;
-        assert!(d.equal(&v)?);
+        assert!(d.is_equal(&v)?);
 
         let mut d = Tensor::zeros(&[2, 3, 6, 6], &Default::default())?;
         d.i_mut((0, 0, 0..6, 0..6))?.fill_f64(1.0)?; // first image in batch red

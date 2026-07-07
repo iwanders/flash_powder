@@ -121,7 +121,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L10556)
     /// - [pytorch equivalent](https://docs.pytorch.org/docs/2.11/generated/torch.Tensor.equal.html)
     ///
-    fn equal<T: TensorAccess>(&self, other: &T) -> StableTorchResult<bool> {
+    fn is_equal<T: TensorAccess>(&self, other: &T) -> StableTorchResult<bool> {
         let mut stack: [StableIValue; 2] =
             [(self.get_tensor()).into(), (other.get_tensor()).into()];
         unsafe_call_dispatch_bail!("aten::equal", "", stack.as_mut_slice());
@@ -658,13 +658,13 @@ mod test {
         // Currently lazy copy
         let old_n_ptr = n.const_data_ptr();
         assert_eq!(n.const_data_ptr(), a.const_data_ptr());
-        assert!(n.equal(&a)?);
+        assert!(n.is_equal(&a)?);
 
         // Verify n holds same data
         assert_eq!(n.f32s_ref()?[0], 50.0);
         // Modify n, this performs the copy.
         n.f32s_mut()?[0] = 20.0;
-        assert_eq!(n.equal(&a)?, false);
+        assert_eq!(n.is_equal(&a)?, false);
 
         // data pointer shouldn't be the same now.
         assert_ne!(n.const_data_ptr(), old_n_ptr);
@@ -797,7 +797,7 @@ mod test {
 
         let v_c = v.contiguous()?;
         assert_eq!(v_c.is_contiguous(), true);
-        assert_eq!(v.equal(&v_c)?, true);
+        assert_eq!(v.is_equal(&v_c)?, true);
 
         Ok(())
     }
