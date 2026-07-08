@@ -217,9 +217,38 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     ///
     /// It would be the following kernel: [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L554)
     ///
-    /// For now, we'll use the direct calls.
+    /// ~For now, we'll use the direct calls.~ The use of `aoti_torch_cpu_add_Tensor` and its CUDA flavour is problematic as that errors if we use integer tensors.
+    /// So instead, we rely on `addcmul`, which conveniently has `_foreach` overload that takes the scalars in a Tensor itself.
+    /// - [addcmul](https://docs.pytorch.org/docs/2.13/generated/torch.addcmul.html)
+    /// - [native_functions](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L11241)
+    // https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L11241
     fn add<T: TensorAccess + TensorProperties>(&self, other: &T) -> StableTorchResult<Tensor> {
-        aoti_torch_add_helper(&self.ten()?, other, 1.0)
+        // Tensor[] self, Tensor[] tensor1, Tensor[] tensor2, Tensor scalars
+        // Math is out_i = input_i + value * tensor1+_i + tensor2_i
+        // For addition; value=1, tensor2_i = 1
+        // According to https://docs.pytorch.org/docs/2.13/tensor_attributes.html scalars are least important in
+        // promotion rules. So we can just make value and tensor2 always integers.
+        let one: Tensor = 1u8.try_into()?;
+        let self_array: &[StableIValue] = &[(self.get_tensor()).into()];
+        let other_array: &[StableIValue] = &[(other.get_tensor()).into()];
+        let tensor2_array: &[StableIValue] = &[(one.get_tensor()).into()];
+        let scalars: Tensor = [1u8].try_into()?;
+        let mut stack: [StableIValue; 4] = [
+            (&self_array[..]).into(),
+            (&other_array[..]).into(),
+            (&tensor2_array[..]).into(),
+            scalars.get_tensor().into(),
+        ];
+        unsafe_call_dispatch_panic!("aten::_foreach_addcmul", "Tensor", stack.as_mut_slice());
+        // This returns a list... How do we handle that?
+        let v: Vec<StableIValue> = stack[0].try_into()?;
+        let t: StableTensor = v
+            .first()
+            .copied()
+            .ok_or(anyhow::format_err!("no value to retrieve"))?
+            .try_into()?;
+        let r: Tensor = Tensor::new(t);
+        Ok(r)
     }
 
     /// Sub
@@ -229,9 +258,33 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     ///
     /// It would be the following kernel: [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L554)
     ///
-    /// For now, we'll use the direct calls.
+    /// See [`Self::add`] for explanation on what we do now.
     fn sub<T: TensorAccess + TensorProperties>(&self, other: &T) -> StableTorchResult<Tensor> {
-        aoti_torch_add_helper(&self.ten()?, other, -1.0)
+        // Tensor[] self, Tensor[] tensor1, Tensor[] tensor2, Tensor scalars
+        // Math is out_i = input_i + value * tensor1+_i + tensor2_i
+        // For addition; value=1, tensor2_i = 1
+        // According to https://docs.pytorch.org/docs/2.13/tensor_attributes.html scalars are least important in
+        // promotion rules. So we can just make value and tensor2 always integers.
+        let one: Tensor = 1u8.try_into()?;
+        let self_array: &[StableIValue] = &[(self.get_tensor()).into()];
+        let other_array: &[StableIValue] = &[(other.get_tensor()).into()];
+        let tensor2_array: &[StableIValue] = &[(one.get_tensor()).into()];
+        let scalars: Tensor = [-1i8].try_into()?;
+        let mut stack: [StableIValue; 4] = [
+            (&self_array[..]).into(),
+            (&other_array[..]).into(),
+            (&tensor2_array[..]).into(),
+            scalars.get_tensor().into(),
+        ];
+        unsafe_call_dispatch_panic!("aten::_foreach_addcmul", "Tensor", stack.as_mut_slice());
+        let v: Vec<StableIValue> = stack[0].try_into()?;
+        let t: StableTensor = v
+            .first()
+            .copied()
+            .ok_or(anyhow::format_err!("no value to retrieve"))?
+            .try_into()?;
+        let r: Tensor = Tensor::new(t);
+        Ok(r)
     }
 
     /// Permute
@@ -499,50 +552,6 @@ impl<'a> TenMut<'a> {
 
         Ok(TenMut::new(self.into_parent(), r))
     }
-}
-
-fn aoti_torch_add_helper<A: TensorAccess + TensorProperties, B: TensorAccess + TensorProperties>(
-    a: &A,
-    other: &B,
-    alpha: f64,
-) -> StableTorchResult<Tensor> {
-    let stable_self = a.get_tensor();
-    let stable_other = other.get_tensor();
-
-    if a.device() != other.device() {
-        anyhow::bail!(
-            "operands for add are not on same device ({:?} and {:?})",
-            a.device(),
-            other.device()
-        )
-    }
-    let mut handle_res: AtenTensorHandle = std::ptr::null_mut();
-
-    if a.is_cpu() && other.is_cpu() {
-        unsafe_call_bail!(aoti_torch_cpu_add_Tensor(
-            stable_self.get(),
-            stable_other.get(),
-            alpha,
-            &mut handle_res
-        ));
-    } else if a.is_cuda() && other.is_cuda() {
-        if cfg!(not(feature = "cuda")) {
-            anyhow::bail!("cannot add two cuda tensors without cuda support");
-        }
-        #[cfg(feature = "cuda")]
-        unsafe_call_bail!(aoti_torch_cuda_add_Tensor(
-            stable_self.get(),
-            stable_other.get(),
-            alpha,
-            &mut handle_res
-        ));
-    }
-    if handle_res.is_null() {
-        anyhow::bail!("computation of addition failed");
-    }
-
-    let r: Tensor = Tensor::new(StableTensor::from_handle(handle_res));
-    Ok(r)
 }
 
 #[cfg(test)]
@@ -1142,6 +1151,56 @@ mod test {
         let sub = x.sub(&x2)?;
         assert_eq!(sub.f64s_ref()?, &[1.0f64, 1.0, 3.0]); // #PYTHON sub.ravel().tolist()
 
+        // And for integer, because that's broken :(
+        /*
+            #|PYTHON
+            x = torch.tensor([1, 2, 3])
+            x2 = torch.tensor([0, 1, 0])
+            added = x + x2
+            sub = x - x2
+        */
+        let x: Tensor = [1, 2, 3].try_into()?;
+        let x2: Tensor = [0, 1, 0].try_into()?;
+        let added = x.add(&x2)?;
+        assert_eq!(added.i32s_ref()?, &[1i32, 3, 3]); // #PYTHON added.ravel().tolist()
+
+        let sub = x.sub(&x2)?;
+        assert_eq!(sub.i32s_ref()?, &[1i32, 1, 3]); // #PYTHON sub.ravel().tolist()
+
+        // Also verify that we can do larger numbers and they don't get rounded on u8 or something silly.
+        /*
+            #|PYTHON
+            x = torch.tensor([1<<50, 1<<62, 0], dtype=torch.int64)
+            x2 = torch.tensor([1337, 1337, 1337], dtype=torch.int64)
+            added = x + x2
+            sub = x - x2
+        */
+        let x: Tensor = [(1i64 << 50), (1 << 62), 0].try_into()?;
+        let x2: Tensor = [1337i64, 1337, 1337].try_into()?;
+        let added = x.add(&x2)?;
+        assert_eq!(
+            added.i64s_ref()?,
+            &[1125899906843961i64, 4611686018427389241, 1337]
+        ); // #PYTHON added.ravel().tolist()
+
+        let sub = x.sub(&x2)?;
+        assert_eq!(
+            sub.i64s_ref()?,
+            &[1125899906841287i64, 4611686018427386567, -1337]
+        ); // #PYTHON sub.ravel().tolist()
+
+        // And also check some larger floats
+        /*
+            #|PYTHON
+            x = torch.tensor([1.0e8, 2.0e16, 3.0e30], dtype=torch.double)
+            x2 = torch.tensor([1.0e9, 2e18, 0.0], dtype=torch.double)
+            added = x + x2
+            sub = x - x2
+        */
+        let x: Tensor = [1.0e8, 2.0e16, 3.0e30].try_into()?;
+        assert_eq!(x.f64s_ref()?, &[100000000.0, 2e+16, 3e+30]); // #PYTHON x.tolist()
+        let x2: Tensor = [1.0e9, 2e18, 0.0].try_into()?;
+        assert_eq!(x2.f64s_ref()?, &[1000000000.0, 2e+18, 0.0]); // #PYTHON x2.tolist()
         Ok(())
     }
 }
