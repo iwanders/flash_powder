@@ -29,8 +29,7 @@
 Todo;
     - Figure out how do we want to do overloads??? SHould it take input arguments?
         Example is squeeze_dim; https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L5856
-    - Stacking of tensors?
-    - Swap V and B
+    - That from_blob thing to be able to to zerocopy creation from safetensors.
 Nice to have:
     - Printing with scientific mode / int mode, see comment in printing.rs
     - Summarized printing without copying the entire tensor to contiguous and cpu, only copy what is printed.

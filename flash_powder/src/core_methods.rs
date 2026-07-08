@@ -362,6 +362,18 @@ impl<'a> Ten<'a> {
         assert_eq!(self.const_data_ptr(), r.const_data_ptr());
         Ok(Ten::new(self.as_parent(), r))
     }
+    /// Unsqueeze
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L6658)
+    /// - [tensor method](https://docs.pytorch.org/docs/2.11/generated/torch.Tensor.unsqueeze.html)
+    /// - [pytorch method](https://docs.pytorch.org/docs/2.11/generated/torch.unsqueeze.html#torch.unsqueeze)
+    pub fn into_unsqueeze(self, dim: isize) -> StableTorchResult<Ten<'a>> {
+        let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), dim.into()];
+        unsafe_call_dispatch_bail!("aten::unsqueeze", "", stack.as_mut_slice());
+        let r: StableTensor = stack[0].try_into()?;
+        assert_eq!(self.const_data_ptr(), r.const_data_ptr());
+        Ok(Ten::new(self.as_parent(), r))
+    }
 }
 
 /// Core methods that require mutable access.

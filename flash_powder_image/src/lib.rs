@@ -107,6 +107,13 @@ where
         } else {
             self.ten()?
         };
+        let v = match v.dim() {
+            3 => v.unsqueeze(0)?.into_unsqueeze(0)?,
+            4 => v.unsqueeze(0)?,
+            5 => v,
+            _ => unreachable!(),
+        };
+        assert_eq!(v.dim(), 5);
 
         // Perform a grandiose swap to interleave the data.
         //let channels_stacked = t.permute(&[2, 0, 1])?;
@@ -159,6 +166,20 @@ where
         // Next, we can make the dynamic image.
         let width = (image_per_row * image_width) as u32;
         let height = (image_rows * image_height) as u32;
+
+        // We need to permute again...
+        // V, B, H, W, 3
+        // But with B=2, that results in images looking like:
+        // AA AA
+        // BB BB
+        //
+        // Instead of
+        // AA BB
+        // AA BB
+        // Need to swap B & H
+        // V H B W 3
+        let v = v.permute(&[0, 2, 1, 3, 4])?.contiguous()?;
+
         //let mut img = image::DynamicImage::new(out_width as u32, out_height as u32, color_type);
         // And now it should be a single byte copy? O_o
         // Save for the fact that as_mut_bytes() doesn't exist... so we need to actually handle them seperately.
@@ -337,11 +358,14 @@ mod test {
             .div(&f32_255)?;
         assert!(d.is_equal(&v)?);
 
-        let mut d = Tensor::zeros(&[2, 3, 6, 6], &Default::default())?;
+        let mut d = Tensor::zeros(&[3, 3, 6, 6], &Default::default())?;
         d.i_mut((0, 0, 0..6, 0..6))?.fill_f64(1.0)?; // first image in batch red
         d.i_mut((1, 2, 0..6, 0..6))?.fill_f64(1.0)?; // second image in batch blue.
+        d.i_mut((2, 1, 0..6, 0..6))?.fill_f64(1.0)?; // third image in batch green.
         d.save_image("/tmp/fp_rgb_b2.png").unwrap();
         // This doesn't work yet... we need to do this image-by image.
+
+        // Now test the row functionality.
 
         Ok(())
     }
