@@ -57,7 +57,6 @@ macro_rules! impl_as_ref {
 /// These methods are only valid if the data is on the CPU.
 pub trait DataRef: TensorAccess + TensorProperties {
     /// Direct access to the byte slice backing the tensor.
-    /// This always provides the ENTIRE storage slice, and does materialize the data if we're in a COW situation.
     fn data(&self) -> StableTorchResult<&[u8]> {
         if !self.is_contiguous() {
             bail!("cannot get slice into non contiguous tensor");

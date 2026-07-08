@@ -116,7 +116,7 @@ where
             self.ten()?
         };
         let v = match v.dim() {
-            3 => v.unsqueeze(0)?.into_unsqueeze(0)?,
+            3 => v.unsqueeze(0)?.unsqueeze(0)?,
             4 => v.unsqueeze(0)?,
             5 => v,
             _ => unreachable!(),
@@ -384,6 +384,10 @@ mod test {
         assert_eq!(img.get_pixel(1, 1), &image::Rgba([255, 0, 0, 255]));
         assert_eq!(img.get_pixel(4, 1), &image::Rgba([0, 0, 255, 255]));
         assert_eq!(img.get_pixel(2, 4), &image::Rgba([0, 255, 0, 255]));
+
+        // And if we add a zero dimension into the channel, we should get 4, 1, 6, 6, so four images in a batch.
+        let batched = d.unsqueeze(1)?;
+        batched.save_image("/tmp/fp_rgba_f32_batch.png")?;
 
         // These batches we can't really test... since we make a composite.
         let mut d = Tensor::zeros(&[3, 3, 6, 6], &Default::default())?;
