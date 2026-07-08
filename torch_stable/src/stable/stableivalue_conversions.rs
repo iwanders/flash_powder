@@ -13,7 +13,7 @@ use crate::{
         device::{Device, DeviceIndex},
         tensor::Tensor,
     },
-    unsafe_call_panic,
+    unsafe_call_bail, unsafe_call_panic,
 };
 
 // https://github.com/pytorch/pytorch/blob/3848e11d554a7f49925b593c40b8be0b86ac6b3f/torch/csrc/stable/stableivalue_conversions.h#L100-L101
@@ -241,3 +241,37 @@ impl TryFrom<StableIValue> for bool {
         }
     }
 }
+impl TryFrom<StableIValue> for Vec<StableIValue> {
+    type Error = anyhow::Error;
+    fn try_from(value: StableIValue) -> Result<Self, Self::Error> {
+        let mut size_retrieved = 0;
+        let handle_res: StableListHandle = value.0 as _;
+        unsafe_call_bail!(torch_list_size(handle_res, &mut size_retrieved));
+        let mut res: Vec<StableIValue> = vec![StableIValue(0); size_retrieved];
+        for i in 0..size_retrieved {
+            unsafe_call_bail!(torch_list_get_item(handle_res, i, &mut res[i]));
+        }
+        // Now that we have copied the values, we need to delete the list.
+        unsafe_call_bail!(torch_delete_list(handle_res));
+
+        Ok(res)
+    }
+}
+
+/*
+impl<'a, T> From<&'a [T]> for StableIValue
+// HeaderOnlyArrayRef
+where
+    T: Into<StableIValue>,
+    T: Copy,
+{
+    fn from(values: &'a [T]) -> Self {
+        let mut handle_res: StableListHandle = std::ptr::null_mut();
+        unsafe_call_panic!(torch_new_list_reserve_size(values.len(), &mut handle_res));
+        for v in values.iter() {
+            unsafe_call_panic!(torch_list_push_back(handle_res, (*v).into()));
+        }
+        StableIValue(handle_res as u64)
+    }
+}
+*/
