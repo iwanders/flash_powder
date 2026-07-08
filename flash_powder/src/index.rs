@@ -222,6 +222,25 @@ where
     }
 }
 
+impl<'a, A: Clone, B: Clone, C: Clone, D: Clone, E: Clone, T: TensorIndexWorker> IndexSpec<T>
+    for (A, B, C, D, E)
+where
+    A: Into<TensorIndexOptions<'a>>,
+    B: Into<TensorIndexOptions<'a>>,
+    C: Into<TensorIndexOptions<'a>>,
+    D: Into<TensorIndexOptions<'a>>,
+    E: Into<TensorIndexOptions<'a>>,
+{
+    fn do_index<'b>(&self, tensor: &'b T) -> StableTorchResult<Ten<'b>> {
+        let first: TensorIndexOptions<'_> = self.0.clone().into();
+        let second: TensorIndexOptions<'_> = self.1.clone().into();
+        let third: TensorIndexOptions<'_> = self.2.clone().into();
+        let four: TensorIndexOptions<'_> = self.3.clone().into();
+        let five: TensorIndexOptions<'_> = self.4.clone().into();
+        tensor.do_the_real_indexing(&[&first, &second, &third, &four, &five])
+    }
+}
+
 // ------------------------------------------------------------------------------------------
 // and the mut flavours.
 trait TensorIndexWorkerMut: CoreMethodsMut + CoreMethods {
@@ -343,6 +362,25 @@ where
         let third: TensorIndexOptions<'_> = self.2.clone().into();
         let four: TensorIndexOptions<'_> = self.3.clone().into();
         tensor.do_the_real_indexing_mut(&[&first, &second, &third, &four])
+    }
+}
+
+impl<'a, A: Clone, B: Clone, C: Clone, D: Clone, E: Clone, T: TensorIndexWorkerMut> IndexSpecMut<T>
+    for (A, B, C, D, E)
+where
+    A: Into<TensorIndexOptions<'a>>,
+    B: Into<TensorIndexOptions<'a>>,
+    C: Into<TensorIndexOptions<'a>>,
+    D: Into<TensorIndexOptions<'a>>,
+    E: Into<TensorIndexOptions<'a>>,
+{
+    fn do_index_mut<'b>(&self, tensor: &'b mut T) -> StableTorchResult<TenMut<'b>> {
+        let first: TensorIndexOptions<'_> = self.0.clone().into();
+        let second: TensorIndexOptions<'_> = self.1.clone().into();
+        let third: TensorIndexOptions<'_> = self.2.clone().into();
+        let four: TensorIndexOptions<'_> = self.3.clone().into();
+        let five: TensorIndexOptions<'_> = self.4.clone().into();
+        tensor.do_the_real_indexing_mut(&[&first, &second, &third, &four, &five])
     }
 }
 
