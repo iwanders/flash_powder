@@ -125,6 +125,20 @@ The functionality in this crate is a subset of the upstream functionality, it do
 
 Helper utilities for working with [safetensors](https://huggingface.co/docs/safetensors/index) are available in the [flash_powder_safetensors](./flash_powder_safetensors) crate.
 
+### flash_powder_image
+
+Helper utilities for working with the Rust [image](https://docs.rs/image/latest/image/) crate available in the [flash_powder_image](./flash_powder_image) crate.
+
+The most useful functionality of this crate is that it facilitates reading and writing images directly to and from Tensors:
+```rust
+let img = Tensor::read_image("super_cool_image.png")?; // [C, H, W], DType::U8, [0, 255]
+img.save_image("/tmp/it_was_really_cool.png")?;  // Expects [C, H, W], DType::U8 in [0, 255], or float in [0, 1.0].
+```
+
+It also handles `[B, C, H, W`], which creates a row of images, and `[V, B, C, H, W]` to vertically stack batched image rows.
+
+
+
 ## Usage
 
 Run this to add the dependency to a cargo project in both `build-dependencies` and `dependencies`;

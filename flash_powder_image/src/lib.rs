@@ -1,5 +1,10 @@
 //! Helper tooling for interop with [image].
 //!
+//! Main functionality:
+//! - [`TensorToImage::save_image`] to write an image to disk from a tensor.
+//! - [`TensorFromImage::read_image`] to read an image from disk into a `[C, H, W]` tensor.
+//!
+//!
 
 use flash_powder as fp;
 use fp::Tensor;
@@ -28,11 +33,14 @@ pub trait TensorToImage {
     ///
     /// The interleaved flavour (`[H, W, 3]`) is not handled, neither are 2 channel images.
     ///
-    /// All integer types are expected to fit within a byte [0, 255]. All (supported) float types in [0.0, 1.0].
-    /// All images are exported as [0, 255] u8.
+    /// - All integer types are expected to fit within a byte `[0, 255]`.
+    /// - All (supported) float types in `[0.0, 1.0]`.
+    /// - All images are exported as `[0, 255]` u8.
     ///
     /// The pytorch side only accepts (B x C x H x W), with an argument to specify number per row, this function puts
     /// the B dimension always on the same row, but you can do  (V x B x C x H x W), where V is stacking rows.
+    ///
+    /// This calls into [`Self::to_dynamic_image`], and then calls [`image::DynamicImage::save`].
     fn save_image<Q>(&self, path: Q) -> StableTorchResult<()>
     where
         Q: AsRef<std::path::Path>;
@@ -114,31 +122,32 @@ where
             _ => unreachable!(),
         };
         assert_eq!(v.dim(), 5);
+        // The dimension is now consistent on [V, B, C, H, W]
 
-        // Perform a grandiose swap to interleave the data.
-        //let channels_stacked = t.permute(&[2, 0, 1])?;
+        // Negative indices because at first the dim count wasn't constant.
+        let image_width = v.isize(-1);
+        let image_height = v.isize(-2);
+        let image_per_row = v.isize(-4);
+        let image_rows = v.isize(-5);
+        // Perform a grandiose swap to interleave the data and ensure the batch grid is correct.
+
+        // The dimension is now consistent on [V, B, C, H, W]
+        //                                     0  1  2  3  4
+        // We need to permute again...
+        // V, B, H, W, 3
+        // But with B=2, that results in images looking like:
+        // AA AA
+        // BB BB
         //
-        // Next, we move the third from last to the end, moving height and width left.
-        let dimension_count = v.dim();
-        let current_order: Vec<usize> = (0..dimension_count).into_iter().collect();
-        let channel_count = current_order[dimension_count - 3];
-        let height = current_order[dimension_count - 2];
-        let width = current_order[dimension_count - 1];
-        let mut desired_channel_order = current_order;
-        desired_channel_order[dimension_count - 3] = height;
-        desired_channel_order[dimension_count - 2] = width;
-        desired_channel_order[dimension_count - 1] = channel_count;
-
-        // Permute it, and also make sure we get a contiguous block of data back.
-        let v = v.permute(&desired_channel_order)?.contiguous()?;
-
-        // Cool now we have an interleaved image, but it may still be varying dimensionality at the front.
-        // [V, B, C, H, W]
-
-        let image_width = v.isize(-2);
-        let image_height = v.isize(-3);
-        let image_per_row = if v.dim() > 3 { v.isize(-4) } else { 1 };
-        let image_rows = if v.dim() == 5 { v.isize(-5) } else { 1 };
+        // Instead of
+        // AA BB
+        // AA BB
+        // Need to swap B & H
+        // V H B W 3
+        //
+        // and the channel swap, so we go to;
+        // [V, H, B, W, 3]
+        let v = v.permute(&[0, 3, 1, 4, 2])?.contiguous()?;
 
         let info = get_info(v.dtype());
 
@@ -162,19 +171,6 @@ where
         // Next, we can make the dynamic image.
         let width = (image_per_row * image_width) as u32;
         let height = (image_rows * image_height) as u32;
-
-        // We need to permute again...
-        // V, B, H, W, 3
-        // But with B=2, that results in images looking like:
-        // AA AA
-        // BB BB
-        //
-        // Instead of
-        // AA BB
-        // AA BB
-        // Need to swap B & H
-        // V H B W 3
-        let v = v.permute(&[0, 2, 1, 3, 4])?.contiguous()?;
 
         //let mut img = image::DynamicImage::new(out_width as u32, out_height as u32, color_type);
         // And now it should be a single byte copy? O_o
@@ -212,14 +208,32 @@ where
 }
 
 pub trait TensorFromImage {
-    /// Like [decode_image](https://docs.pytorch.org/vision/main/generated/torchvision.io.decode_image.html#torchvision.io.decode_image)
+    /// Convert an [`image::DynamicImage`] to a tensor.
     ///
-    /// The values of the output tensor are in uint8 in [0, 255] for most cases.
-    ///
-    /// output (Tensor[image_channels, image_height, image_width])
+    /// This follows the exact same semantics as [`Self::read_image`].
     fn from_dynamic_image(dynamic_image: &image::DynamicImage) -> StableTorchResult<Tensor>;
 
     /// Read an image from disk.
+    ///
+    /// The values of the output tensor are in [`fp::DType::U8`] in `[0, 255]` for most cases, it's shape is `[C, H, W]`.
+    ///
+    /// Images always become 3 dimensional;
+    /// - greyscale: `[1, H, W]`.
+    /// - rgb:  `[3, H, W]`.
+    /// - rgba: `[4, H, W]`.
+    ///
+    /// Other channel counts are currently not supported.
+    ///
+    /// Type is chosen based on data width per channel:
+    /// - 1 byte: [`fp::DType::U8`]
+    /// - 2 byte: [`fp::DType::U16`]
+    /// - 4 byte: [`fp::DType::F32`]
+    ///
+    /// Similar to TorchVision's Like [decode_image](https://docs.pytorch.org/vision/main/generated/torchvision.io.decode_image.html#torchvision.io.decode_image).
+    ///
+    /// `output (Tensor[image_channels, image_height, image_width])`
+    ///
+    /// This loads an [`image::DynamicImage`] from disk and passes it to [`Self::from_dynamic_image`].
     fn read_image<Q>(path: Q) -> StableTorchResult<Tensor>
     where
         Q: AsRef<std::path::Path>;
@@ -352,7 +366,7 @@ mod test {
         d.i_mut((.., 3..6, 3..6))?.fill_f64(1.0)?;
         // Opacity for the middle section.
         d.i_mut((3, 1..5, 1..5))?.fill_f64(1.0)?;
-        d.save_image("/tmp/fp_rgba_f32.png").unwrap();
+        d.save_image("/tmp/fp_rgba_f32.png")?;
         let img = image::ImageReader::open(&"/tmp/fp_rgba_f32.png")?.decode()?;
         assert!(matches!(img, image::DynamicImage::ImageRgba8(_)));
         let v = Tensor::read_image("/tmp/fp_rgba_f32.png")?
