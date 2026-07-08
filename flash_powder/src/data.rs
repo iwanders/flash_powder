@@ -15,7 +15,7 @@ use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
 use crate::dtype::ScalarDType;
 use crate::{
     properties::TensorProperties,
-    tensor::{Ten, TenMut, Tensor, TensorAccess},
+    tensor::{Ten, TenMut, Tensor, TensorAccess, TensorAccessMut},
 };
 use torch_stable::{StableTorchResult, contrib::TensorPropertiesContrib as _};
 
@@ -224,7 +224,7 @@ macro_rules! impl_as_mut {
 /// Methods ending with 's' return a slice.
 ///
 /// These methods are only valid if the data is on the CPU.
-pub trait DataMut: TensorAccess + TensorProperties {
+pub trait DataMut: TensorAccessMut + TensorProperties {
     /// Direct access to the mutable byte slice backing the tensor.
     fn data_mut(&mut self) -> StableTorchResult<&mut [u8]> {
         if !self.is_contiguous() {

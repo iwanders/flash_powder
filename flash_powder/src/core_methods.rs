@@ -19,9 +19,9 @@
 
 use crate::dtype::DType;
 use crate::factory::ToOptions;
-use crate::properties::TensorProperties;
+use crate::properties::{TensorProperties, TensorPropertiesMut};
 use crate::size::Size;
-use crate::{StableTorchResult, Ten, TenMut, Tensor, TensorAccess};
+use crate::{StableTorchResult, Ten, TenMut, Tensor, TensorAccess, TensorAccessMut};
 use torch_stable::{
     aoti_torch::StableIValue, stable::tensor::Tensor as StableTensor, unsafe_call_bail,
     unsafe_call_dispatch_bail,
@@ -367,7 +367,7 @@ impl<'a> Ten<'a> {
 /// Core methods that require mutable access.
 ///
 /// See the [`core_methods`][crate::core_methods] module for description of this trait's functionality.
-pub trait CoreMethodsMut: TensorAccess + TensorProperties {
+pub trait CoreMethodsMut: TensorAccessMut + TensorPropertiesMut {
     fn narrow_mut(
         &mut self,
         dim: usize,
@@ -454,7 +454,7 @@ pub trait CoreMethodsMut: TensorAccess + TensorProperties {
     }
 }
 impl CoreMethodsMut for Tensor {}
-impl<'a> CoreMethodsMut for Ten<'a> {}
+// impl<'a> CoreMethodsMut for Ten<'a> {}
 impl<'a> CoreMethodsMut for TenMut<'a> {}
 
 impl<'a> TenMut<'a> {

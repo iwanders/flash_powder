@@ -1,6 +1,6 @@
 //! Retrieve properties like [`sizes`][`TensorProperties::sizes()`] from any [`TensorAccess`].
 
-use crate::{Ten, TenMut, Tensor, TensorAccess, dtype::DType};
+use crate::{Ten, TenMut, Tensor, TensorAccess, TensorAccessMut, dtype::DType};
 use torch_stable::headeronly::core::Layout;
 use torch_stable::stable::device::{Device, DeviceIndex};
 
@@ -87,14 +87,19 @@ pub trait TensorProperties: TensorAccess {
     fn const_data_ptr(&self) -> *const u8 {
         self.get_tensor().const_data_ptr()
     }
+}
 
+impl TensorProperties for Tensor {}
+impl<'a> TensorProperties for Ten<'a> {}
+impl<'a> TensorProperties for TenMut<'a> {}
+
+pub trait TensorPropertiesMut: TensorAccessMut + TensorProperties {
     fn mutable_data_ptr(&mut self) -> *mut u8 {
         self.get_tensor_mut().mutable_data_ptr()
     }
 }
-impl TensorProperties for Tensor {}
-impl<'a> TensorProperties for Ten<'a> {}
-impl<'a> TensorProperties for TenMut<'a> {}
+impl TensorPropertiesMut for Tensor {}
+impl<'a> TensorPropertiesMut for TenMut<'a> {}
 
 #[cfg(test)]
 mod test {

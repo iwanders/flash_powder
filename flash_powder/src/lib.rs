@@ -60,7 +60,7 @@ pub mod printing;
 
 /// Shorthands to types.
 pub use dtype::DType;
-pub use tensor::{Ten, TenMut, Tensor, TensorAccess};
+pub use tensor::{Ten, TenMut, Tensor, TensorAccess, TensorAccessMut};
 pub use torch_stable::StableTorchResult;
 
 pub use torch_stable::headeronly::core::{Layout, MemoryFormat};
@@ -80,7 +80,7 @@ pub mod prelude {
     #[doc(inline)]
     pub use factory::TensorFactory;
     #[doc(inline)]
-    pub use properties::TensorProperties;
+    pub use properties::{TensorProperties, TensorPropertiesMut};
     // #[doc(inline)]
     // pub use tensor::{Ten, TenMut, Tensor, TensorAccess};
 
