@@ -156,6 +156,39 @@ pub trait TensorFactory: TensorAccess + TensorProperties {
         Ok(Tensor::new(r))
     }
 
+    /// A new ones vector
+    ///
+    ///
+    ///
+    /// ```rust
+    /// # use flash_powder::prelude::*;
+    /// # use flash_powder::{StableTorchResult, Tensor};
+    /// # use flash_powder as fp;
+    /// # fn foo() -> StableTorchResult<()>{
+    ///   let t = Tensor::ones(&[3,3], &fp::DType::U8.into())?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L4621)
+    /// - [pytorch equivalent](https://docs.pytorch.org/docs/2.12/generated/torch.ones.html)
+    ///
+    //
+    // https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L6800
+    fn ones(dimensions: &[usize], options: &TensorOptions) -> StableTorchResult<Tensor> {
+        let mut stack: [StableIValue; 5] = [
+            (dimensions).into(),
+            (&options.dtype).into(),
+            (&options.layout).into(),
+            (&options.device).into(),
+            (&options.pin_memory).into(),
+        ];
+        unsafe_call_dispatch_bail!("aten::ones", "", stack.as_mut_slice());
+        let r: StableTensor = stack[0].try_into()?;
+
+        Ok(Tensor::new(r))
+    }
+
     /// A new randn tensor
     ///
     ///

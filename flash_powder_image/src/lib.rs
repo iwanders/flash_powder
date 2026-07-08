@@ -140,10 +140,6 @@ where
         let image_per_row = if v.dim() > 3 { v.isize(-4) } else { 1 };
         let image_rows = if v.dim() == 5 { v.isize(-5) } else { 1 };
 
-        if image_per_row != 1 || image_rows != 1 {
-            dbg!(" need to do some work to correctly support this! ");
-        }
-
         let info = get_info(v.dtype());
 
         let v = if info.is_float {
@@ -221,7 +217,7 @@ pub trait TensorFromImage {
     /// The values of the output tensor are in uint8 in [0, 255] for most cases.
     ///
     /// output (Tensor[image_channels, image_height, image_width])
-    fn from_dynamic_image(dynamic_image: image::DynamicImage) -> StableTorchResult<Tensor>;
+    fn from_dynamic_image(dynamic_image: &image::DynamicImage) -> StableTorchResult<Tensor>;
 
     /// Read an image from disk.
     fn read_image<Q>(path: Q) -> StableTorchResult<Tensor>
@@ -230,7 +226,7 @@ pub trait TensorFromImage {
 }
 
 impl TensorFromImage for Tensor {
-    fn from_dynamic_image(img: image::DynamicImage) -> StableTorchResult<Tensor> {
+    fn from_dynamic_image(img: &image::DynamicImage) -> StableTorchResult<Tensor> {
         let color = img.color();
         let channels = color.channel_count() as usize;
         let bytes_per_pixel = color.bytes_per_pixel() as usize;
@@ -270,7 +266,7 @@ impl TensorFromImage for Tensor {
         Q: AsRef<std::path::Path>,
     {
         let img = image::ImageReader::open(path)?.decode()?;
-        Self::from_dynamic_image(img)
+        Self::from_dynamic_image(&img)
     }
 }
 
@@ -280,7 +276,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_write_image() -> StableTorchResult<()> {
+    fn test_read_write_image() -> StableTorchResult<()> {
         let u8_255: Tensor = 255u8.try_into()?;
         let f32_255: Tensor = 255.0f32.try_into()?;
         let u16_255: Tensor = 255u16.try_into()?;
@@ -289,19 +285,23 @@ mod test {
         let mut d = Tensor::zeros(&[6, 6], &Default::default())?;
         d.i_mut((0..3, 0..3))?.fill_f64(1.0)?;
         d.save_image("/tmp/fp_greyscale_f32.png").unwrap();
-        assert!(matches!(
-            image::ImageReader::open(&"/tmp/fp_greyscale_f32.png")?.decode()?,
-            image::DynamicImage::ImageLuma8(_)
-        ));
+        let img = image::ImageReader::open(&"/tmp/fp_greyscale_f32.png")?.decode()?;
+        assert!(matches!(img, image::DynamicImage::ImageLuma8(_)));
+        let img = img.to_luma8();
+        assert_eq!(img.get_pixel(0, 0), &image::Luma([255]));
+        assert_eq!(img.get_pixel(5, 0), &image::Luma([0]));
+        let v = Tensor::read_image("/tmp/fp_greyscale_f32.png")?.to(&fp::DType::U8.into())?;
+        assert!(d.unsqueeze(0)?.mul(&f32_255)?.is_equal(&v)?);
 
         // U8, 6 by 6 pixel of greyscale, top left quadrant set to white.
         let mut d = Tensor::zeros(&[6, 6], &fp::DType::U8.into())?;
         d.i_mut((0..3, 0..3))?.fill_tensor(&u8_255)?;
         d.save_image("/tmp/fp_greyscale_u8.png").unwrap();
-        assert!(matches!(
-            image::ImageReader::open(&"/tmp/fp_greyscale_u8.png")?.decode()?,
-            image::DynamicImage::ImageLuma8(_)
-        ));
+        let img = image::ImageReader::open(&"/tmp/fp_greyscale_u8.png")?.decode()?;
+        assert!(matches!(img, image::DynamicImage::ImageLuma8(_)));
+        let img = img.to_luma8();
+        assert_eq!(img.get_pixel(0, 0), &image::Luma([255]));
+        assert_eq!(img.get_pixel(5, 0), &image::Luma([0]));
         let v = Tensor::read_image("/tmp/fp_greyscale_u8.png")?.to(&fp::DType::U8.into())?;
         assert!(d.unsqueeze(0)?.is_equal(&v)?);
 
@@ -309,12 +309,13 @@ mod test {
         let mut d = Tensor::zeros(&[6, 6], &fp::DType::U16.into())?;
         d.i_mut((0..3, 0..3))?.fill_tensor(&u16_255)?;
         d.save_image("/tmp/fp_greyscale_u16.png").unwrap();
-        assert!(matches!(
-            image::ImageReader::open(&"/tmp/fp_greyscale_u16.png")?.decode()?,
-            image::DynamicImage::ImageLuma8(_)
-        ));
+        let img = image::ImageReader::open(&"/tmp/fp_greyscale_u16.png")?.decode()?;
+        assert!(matches!(img, image::DynamicImage::ImageLuma8(_)));
         let v = Tensor::read_image("/tmp/fp_greyscale_u16.png")?.to(&fp::DType::U16.into())?;
         assert!(d.unsqueeze(0)?.is_equal(&v)?);
+        let img = img.to_luma8();
+        assert_eq!(img.get_pixel(0, 0), &image::Luma([255]));
+        assert_eq!(img.get_pixel(5, 0), &image::Luma([0]));
 
         // Test an RGB image.
         let mut d = Tensor::zeros(&[3, 6, 6], &Default::default())?;
@@ -327,14 +328,17 @@ mod test {
         // Bottom right, white
         d.i_mut((.., 3..6, 3..6))?.fill_f64(1.0)?;
         d.save_image("/tmp/fp_rgb_f32.png").unwrap();
-        assert!(matches!(
-            image::ImageReader::open(&"/tmp/fp_rgb_f32.png")?.decode()?,
-            image::DynamicImage::ImageRgb8(_)
-        ));
+        let img = image::ImageReader::open(&"/tmp/fp_rgb_f32.png")?.decode()?;
+        assert!(matches!(img, image::DynamicImage::ImageRgb8(_)));
         let v = Tensor::read_image("/tmp/fp_rgb_f32.png")?
             .to(&fp::DType::F32.into())?
             .div(&f32_255)?;
         assert!(d.is_equal(&v)?);
+        let img = img.to_rgb8();
+        assert_eq!(img.get_pixel(0, 0), &image::Rgb([255, 0, 0]));
+        assert_eq!(img.get_pixel(5, 0), &image::Rgb([0, 0, 255]));
+        assert_eq!(img.get_pixel(0, 5), &image::Rgb([0, 255, 0]));
+        assert_eq!(img.get_pixel(5, 5), &image::Rgb([255, 255, 255]));
 
         // Test an rgba image.
         let mut d = Tensor::zeros(&[4, 6, 6], &Default::default())?;
@@ -349,23 +353,77 @@ mod test {
         // Opacity for the middle section.
         d.i_mut((3, 1..5, 1..5))?.fill_f64(1.0)?;
         d.save_image("/tmp/fp_rgba_f32.png").unwrap();
-        assert!(matches!(
-            image::ImageReader::open(&"/tmp/fp_rgba_f32.png")?.decode()?,
-            image::DynamicImage::ImageRgba8(_)
-        ));
+        let img = image::ImageReader::open(&"/tmp/fp_rgba_f32.png")?.decode()?;
+        assert!(matches!(img, image::DynamicImage::ImageRgba8(_)));
         let v = Tensor::read_image("/tmp/fp_rgba_f32.png")?
             .to(&fp::DType::F32.into())?
             .div(&f32_255)?;
         assert!(d.is_equal(&v)?);
+        let img = img.to_rgba8();
+        // Transparent ones on the borders
+        assert_eq!(img.get_pixel(0, 0), &image::Rgba([255, 0, 0, 0]));
+        assert_eq!(img.get_pixel(5, 0), &image::Rgba([0, 0, 255, 0]));
+        assert_eq!(img.get_pixel(0, 5), &image::Rgba([0, 255, 0, 0]));
+        // White section bottom right.
+        assert_eq!(img.get_pixel(5, 5), &image::Rgba([255, 255, 255, 255]));
+        // Opaque centers
+        assert_eq!(img.get_pixel(1, 1), &image::Rgba([255, 0, 0, 255]));
+        assert_eq!(img.get_pixel(4, 1), &image::Rgba([0, 0, 255, 255]));
+        assert_eq!(img.get_pixel(2, 4), &image::Rgba([0, 255, 0, 255]));
 
+        // These batches we can't really test... since we make a composite.
         let mut d = Tensor::zeros(&[3, 3, 6, 6], &Default::default())?;
         d.i_mut((0, 0, 0..6, 0..6))?.fill_f64(1.0)?; // first image in batch red
         d.i_mut((1, 2, 0..6, 0..6))?.fill_f64(1.0)?; // second image in batch blue.
         d.i_mut((2, 1, 0..6, 0..6))?.fill_f64(1.0)?; // third image in batch green.
         d.save_image("/tmp/fp_rgb_b2.png").unwrap();
-        // This doesn't work yet... we need to do this image-by image.
+        let img = image::ImageReader::open(&"/tmp/fp_rgb_b2.png")?.decode()?;
+        assert!(matches!(img, image::DynamicImage::ImageRgb8(_)));
+        let back = Tensor::from_dynamic_image(&img)?;
+        let square_255 = Tensor::ones(&[6, 6], &fp::DType::U8.into())?.mul(&u8_255)?;
+        let square_0 = Tensor::zeros(&[6, 6], &fp::DType::U8.into())?.mul(&u8_255)?;
+        // First square;
+        assert!(back.i((0, 0..6, 0..6))?.is_equal(&square_255)?);
+        assert!(back.i((1, 0..6, 0..6))?.is_equal(&square_0)?);
+        assert!(back.i((2, 0..6, 0..6))?.is_equal(&square_0)?);
+        let stacked = fp::torch::stack(&[&square_255, &square_0, &square_0], 0)?;
+        assert!(back.i((.., 0..6, 0..6))?.is_equal(&stacked)?);
+        // Second square is blue.
+        let stacked = fp::torch::stack(&[&square_0, &square_0, &square_255], 0)?;
+        assert!(back.i((.., 0..6, 6..12))?.is_equal(&stacked)?);
+        // Last square is green
+        let stacked = fp::torch::stack(&[&square_0, &square_255, &square_0], 0)?;
+        assert!(back.i((.., 0..6, 12..18))?.is_equal(&stacked)?);
 
         // Now test the row functionality.
+        let mut d = Tensor::zeros(&[2, 3, 3, 6, 6], &Default::default())?;
+        d.i_mut((0, 0, 0, 0..6, 0..6))?.fill_f64(1.0)?; // first image in 1st batch red
+        d.i_mut((0, 1, 1..3, 0..6, 0..6))?.fill_f64(1.0)?; // second image in 1st batch cyan.
+        d.i_mut((0, 2, 1, 0..6, 0..6))?.fill_f64(1.0)?; // third image in 1st batch green.
+        d.i_mut((1, 0, 2, 0..6, 0..6))?.fill_f64(1.0)?; // first image in 2nd batch blue
+        d.i_mut((1, 1, 2, 0..6, 0..6))?.fill_f64(1.0)?; // second image in 2nd batch blue.
+        d.i_mut((1, 2, 0..2, 0..6, 0..6))?.fill_f64(1.0)?; // third image in 2nd batch yellow
+        d.save_image("/tmp/fp_rgb_2r_b2.png").unwrap();
+
+        let img = image::ImageReader::open(&"/tmp/fp_rgb_2r_b2.png")?.decode()?;
+        assert!(matches!(img, image::DynamicImage::ImageRgb8(_)));
+        let back = Tensor::from_dynamic_image(&img)?;
+        // First square is red.
+        let stacked = fp::torch::stack(&[&square_255, &square_0, &square_0], 0)?;
+        assert!(back.i((.., 0..6, 0..6))?.is_equal(&stacked)?);
+        // Second square is cyan.
+        let stacked = fp::torch::stack(&[&square_0, &square_255, &square_255], 0)?;
+        assert!(back.i((.., 0..6, 6..12))?.is_equal(&stacked)?);
+        // Last square is green
+        let stacked = fp::torch::stack(&[&square_0, &square_255, &square_0], 0)?;
+        assert!(back.i((.., 0..6, 12..18))?.is_equal(&stacked)?);
+        // Second row first two square is blue;
+        let stacked = fp::torch::stack(&[&square_0, &square_0, &square_255], 0)?;
+        assert!(back.i((.., 6..12, 0..6))?.is_equal(&stacked)?);
+        assert!(back.i((.., 6..12, 6..12))?.is_equal(&stacked)?);
+        // and the last one is yellow.
+        let stacked = fp::torch::stack(&[&square_255, &square_255, &square_0], 0)?;
+        assert!(back.i((.., 6..12, 12..18))?.is_equal(&stacked)?);
 
         Ok(())
     }
