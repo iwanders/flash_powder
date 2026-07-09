@@ -296,14 +296,29 @@ pub trait TensorImageOperations {
     /// Convert an image from integer space to floats in `[0.0, 1.0]`.
     ///
     /// If the [`ToOptions::dtype`][`fp::factory::ToOptions::dtype`] field is empty, it will use [`DType::F32`][`fp::DType::F32`].
-    /// Calculation happens in this type, as well as being the return type.
+    /// Calculation happens in this type, as well as being the return type, for `[0u8, 255]` using [`F16`][`fp::DType::F16`] does not result in loss of precision.
     ///
     /// Integers are scaled with their maximum value.
     fn image_floatify(&self, options: &fp::factory::ToOptions) -> StableTorchResult<Tensor>;
+
+    /// Scales a tensor's values to fit within `[0.0, 1.0]`.
+    ///
+    /// This is helpful if you need to visualise a tensor.
+    ///
+    /// This does:
+    /// ```
+    /// span = self.max() - self.min()
+    /// out = (self - self.min()) / span
+    /// ```
+    ///
+    fn image_scale_to_domain(&self) -> StableTorchResult<Tensor>;
 }
 impl TensorImageOperations for Tensor {
     fn image_floatify(&self, options: &fp::factory::ToOptions) -> StableTorchResult<Tensor> {
         self.ten()?.image_floatify(options)
+    }
+    fn image_scale_to_domain(&self) -> StableTorchResult<Tensor> {
+        self.ten()?.image_scale_to_domain()
     }
 }
 impl<'a> TensorImageOperations for fp::Ten<'a> {
@@ -328,6 +343,10 @@ impl<'a> TensorImageOperations for fp::Ten<'a> {
         let image = self.to(&to_options)?;
         let divisor = divisor.to(&to_options)?;
         image.div(&divisor)
+    }
+    fn image_scale_to_domain(&self) -> StableTorchResult<Tensor> {
+        // let min = self.min()?;
+        todo!();
     }
 }
 
@@ -500,6 +519,18 @@ mod test {
         let stacked = fp::torch::stack(&[&square_255, &square_255, &square_0], 0)?;
         assert!(back.i((.., 6..12, 12..18))?.is_equal(&stacked)?);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_image_floatify_f16() -> StableTorchResult<()> {
+        for i in 0..255u8 {
+            let t: Tensor = i.try_into()?;
+            let floatified_default = t.image_floatify(&Default::default())?;
+            let floatified_f16 = t.image_floatify(&fp::DType::F16.into())?;
+            let floatified_default_f16 = floatified_default.to(&fp::DType::F16.into())?;
+            assert!(floatified_default_f16.is_equal(&floatified_f16)?);
+        }
         Ok(())
     }
 }

@@ -28,7 +28,11 @@
 
 Todo;
     - Figure out how do we want to do overloads??? SHould it take input arguments?
-        Example is squeeze_dim; https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L5856
+        - Example is squeeze_dim; https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L5856
+        - mean(tensor) https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L4041
+        - and mean(&self, mean_options: &MeanOptions) are already ruined :(
+        - Since overloads can always be added, we should probably always just use the full name with _ in between?
+
     - That from_blob thing to be able to to zerocopy creation from safetensors.
     - Addition for u8's... :'( let square_255 = Tensor::zeros(&[6, 6], &fp::DType::U8.into())?.add(&u8_255)?;
 Nice to have:

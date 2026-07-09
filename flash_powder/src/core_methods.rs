@@ -149,6 +149,28 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         Ok(r)
     }
 
+    /// Min of this tensor.
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L9834)
+    /// - [pytorch function](https://docs.pytorch.org/docs/2.13/generated/torch.min.html#torch.min)
+    fn min(&self) -> StableTorchResult<Tensor> {
+        let mut stack: [StableIValue; 1] = [self.get_tensor().into()];
+        unsafe_call_dispatch_bail!("aten::min", "", stack.as_mut_slice());
+        let r: Tensor = Tensor::new(stack[0].try_into().unwrap());
+        Ok(r)
+    }
+
+    /// Max of this tensor.
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L9864)
+    /// - [pytorch function](https://docs.pytorch.org/docs/2.13/generated/torch.max.html#torch.max)
+    fn max(&self) -> StableTorchResult<Tensor> {
+        let mut stack: [StableIValue; 1] = [self.get_tensor().into()];
+        unsafe_call_dispatch_bail!("aten::max", "", stack.as_mut_slice());
+        let r: Tensor = Tensor::new(stack[0].try_into().unwrap());
+        Ok(r)
+    }
+
     /// Lazily clone this into an owning tensor.
     fn to_owned(&self) -> StableTorchResult<Tensor> {
         let mut stack: [StableIValue; 1] = [(self.get_tensor()).into()];
@@ -1219,6 +1241,23 @@ mod test {
         assert_eq!(x.f64s_ref()?, &[100000000.0, 2e+16, 3e+30]); // #PYTHON x.tolist()
         let x2: Tensor = [1.0e9, 2e18, 0.0].try_into()?;
         assert_eq!(x2.f64s_ref()?, &[1000000000.0, 2e+18, 0.0]); // #PYTHON x2.tolist()
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_min_and_max() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            x = torch.tensor([1.0, 2.0, 3.0])
+            min = x.min()
+            max = x.max()
+        */
+        let x: Tensor = [1.0, 2.0, 3.0].try_into()?;
+        let min = x.min()?;
+        let max = x.max()?;
+        assert_eq!(min.f64s_ref()?, &[1.0]); // #PYTHON min.tolist()
+        assert_eq!(max.f64s_ref()?, &[3.0]); // #PYTHON max.tolist()
+
         Ok(())
     }
 }
