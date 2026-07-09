@@ -306,7 +306,7 @@ pub trait TensorImageOperations {
     /// This is helpful if you need to visualise a tensor.
     ///
     /// This does:
-    /// ```
+    /// ```nocode
     /// span = self.max() - self.min()
     /// out = (self - self.min()) / span
     /// ```
@@ -344,9 +344,12 @@ impl<'a> TensorImageOperations for fp::Ten<'a> {
         let divisor = divisor.to(&to_options)?;
         image.div(&divisor)
     }
+
     fn image_scale_to_domain(&self) -> StableTorchResult<Tensor> {
-        // let min = self.min()?;
-        todo!();
+        let min = self.min()?;
+        let max = self.max()?;
+        let span = max.sub(&min)?;
+        self.sub(&min)?.div(&span)
     }
 }
 
@@ -531,6 +534,21 @@ mod test {
             let floatified_default_f16 = floatified_default.to(&fp::DType::F16.into())?;
             assert!(floatified_default_f16.is_equal(&floatified_f16)?);
         }
+        Ok(())
+    }
+    #[test]
+    fn test_image_scale_to_domain() -> StableTorchResult<()> {
+        // Float, 6 by 6 pixel of greyscale, top left quadrant set to white.
+        let mut d = Tensor::zeros(&[6, 6], &Default::default())?;
+        // Top left quadrant +5.0
+        d.i_mut((0..3, 0..3))?.fill_f64(5.0)?;
+        // Bottom left quadrant at -5.0
+        d.i_mut((3..6, 0..3))?.fill_f64(-5.0)?;
+        let d = d.image_scale_to_domain()?; // scale it such that we have the full domain.
+        assert_eq!(d.f32_ref(&[0, 0])?, &1.0);
+        assert_eq!(d.f32_ref(&[5, 0])?, &0.0);
+        assert_eq!(d.f32_ref(&[5, 4])?, &0.5);
+
         Ok(())
     }
 }
