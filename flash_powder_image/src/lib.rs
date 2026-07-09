@@ -16,6 +16,10 @@ pub use image;
 
 use fp::StableTorchResult;
 
+pub mod prelude {
+    pub use super::{ImageToTensor, TensorFromImage, TensorImageOperations, TensorToImage};
+}
+
 pub trait TensorToImage {
     /// Save this tensor as an image.
     ///
