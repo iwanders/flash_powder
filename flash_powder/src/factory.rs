@@ -74,7 +74,7 @@ impl_conversion!(Layout, EmptyOptions, layout);
 impl_conversion!(MemoryFormat, EmptyOptions, memory_format);
 
 
-/// Options to create zero tensors.
+/// Options to create various tensors.
 ///
 /// The types [`Device`], [`DType`], [`Layout`]  implement [`std::convert::From`] for this struct.
 #[derive(Copy, Clone, Debug, Default)]

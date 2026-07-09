@@ -3,7 +3,8 @@
 //! Main functionality:
 //! - [`TensorToImage::save_image`] to write an image to disk from a tensor.
 //! - [`TensorFromImage::read_image`] to read an image from disk into a `[C, H, W]` tensor.
-//!
+//! - [`ImageToTensor::to_tensor`] worker to convert image types to tensor, used by [`TensorFromImage::read_image`].
+//! - [`TensorImageOperations`] common operations, like converting `[0u8, 255]` to `[0.0f32, 1.0]`.
 //!
 
 use flash_powder as fp;
@@ -207,13 +208,10 @@ where
     }
 }
 
-pub trait TensorFromImage {
-    /// Convert an [`image::DynamicImage`] to a tensor.
+pub trait ImageToTensor {
+    /// Convert the image to a tensor.
     ///
-    /// This follows the exact same semantics as [`Self::read_image`].
-    fn from_dynamic_image(dynamic_image: &image::DynamicImage) -> StableTorchResult<Tensor>;
-
-    /// Read an image from disk.
+    /// - Implemented for [`image::DynamicImage`].
     ///
     /// The values of the output tensor are in [`fp::DType::U8`] in `[0, 255]` for most cases, it's shape is `[C, H, W]`.
     ///
@@ -233,19 +231,18 @@ pub trait TensorFromImage {
     ///
     /// `output (Tensor[image_channels, image_height, image_width])`
     ///
-    /// This loads an [`image::DynamicImage`] from disk and passes it to [`Self::from_dynamic_image`].
-    fn read_image<Q>(path: Q) -> StableTorchResult<Tensor>
-    where
-        Q: AsRef<std::path::Path>;
+    ///
+    /// This follows the exact same semantics as [`TensorFromImage::read_image`].
+    fn to_tensor(&self) -> StableTorchResult<Tensor>;
 }
 
-impl TensorFromImage for Tensor {
-    fn from_dynamic_image(img: &image::DynamicImage) -> StableTorchResult<Tensor> {
-        let color = img.color();
+impl ImageToTensor for image::DynamicImage {
+    fn to_tensor(&self) -> StableTorchResult<Tensor> {
+        let color = self.color();
         let channels = color.channel_count() as usize;
         let bytes_per_pixel = color.bytes_per_pixel() as usize;
-        let width = img.width() as usize;
-        let height = img.height() as usize;
+        let width = self.width() as usize;
+        let height = self.height() as usize;
 
         let dtype = match bytes_per_pixel / channels {
             1 => fp::DType::U8,
@@ -266,7 +263,7 @@ impl TensorFromImage for Tensor {
         )?;
 
         // Copy in the data.
-        t.data_mut()?.copy_from_slice(img.as_bytes());
+        t.data_mut()?.copy_from_slice(self.as_bytes());
 
         // And finally, perform the channel swap.
         let channels_stacked = t.permute(&[2, 0, 1])?;
@@ -274,13 +271,63 @@ impl TensorFromImage for Tensor {
         // ANd return an owned version.
         channels_stacked.to_owned()
     }
+}
 
+pub trait TensorFromImage {
+    /// Read an image from disk.
+    ///
+    /// This loads an [`image::DynamicImage`] from disk and calls [`ImageToTensor::to_tensor`] on it.
+    fn read_image<Q>(path: Q) -> StableTorchResult<Tensor>
+    where
+        Q: AsRef<std::path::Path>;
+}
+
+impl TensorFromImage for Tensor {
     fn read_image<Q>(path: Q) -> StableTorchResult<Tensor>
     where
         Q: AsRef<std::path::Path>,
     {
         let img = image::ImageReader::open(path)?.decode()?;
-        Self::from_dynamic_image(&img)
+        img.to_tensor()
+    }
+}
+
+pub trait TensorImageOperations {
+    /// Convert an image from integer space to floats in `[0.0, 1.0]`.
+    ///
+    /// If the [`ToOptions::dtype`][`fp::factory::ToOptions::dtype`] field is empty, it will use [`DType::F32`][`fp::DType::F32`].
+    /// Calculation happens in this type, as well as being the return type.
+    ///
+    /// Integers are scaled with their maximum value.
+    fn image_floatify(&self, options: &fp::factory::ToOptions) -> StableTorchResult<Tensor>;
+}
+impl TensorImageOperations for Tensor {
+    fn image_floatify(&self, options: &fp::factory::ToOptions) -> StableTorchResult<Tensor> {
+        self.ten()?.image_floatify(options)
+    }
+}
+impl<'a> TensorImageOperations for fp::Ten<'a> {
+    fn image_floatify(&self, options: &fp::factory::ToOptions) -> StableTorchResult<Tensor> {
+        let calc_type = options.dtype.unwrap_or(fp::DType::F32);
+        let desired_device = options.device.unwrap_or(self.device());
+        let divisor: Tensor = if self.dtype() == fp::DType::U8 {
+            (u8::MAX).try_into()?
+        } else if self.dtype() == fp::DType::U16 {
+            (u16::MAX).try_into()?
+        } else if self.dtype() == fp::DType::U32 {
+            (u32::MAX).try_into()?
+        } else {
+            1.0.try_into()?
+        };
+        // Move the image and divisor to the desired device.
+        let to_options = fp::factory::ToOptions {
+            dtype: Some(calc_type),
+            device: Some(desired_device),
+            ..Default::default()
+        };
+        let image = self.to(&to_options)?;
+        let divisor = divisor.to(&to_options)?;
+        image.div(&divisor)
     }
 }
 
@@ -301,6 +348,12 @@ mod test {
         d.save_image("/tmp/fp_greyscale_f32.png").unwrap();
         let img = image::ImageReader::open(&"/tmp/fp_greyscale_f32.png")?.decode()?;
         assert!(matches!(img, image::DynamicImage::ImageLuma8(_)));
+        println!("d: {d:?}");
+        let floatified = img.to_tensor()?.image_floatify(&Default::default())?;
+        let floatified = floatified.squeeze()?;
+        println!("img: {img:?}");
+        println!("floatified: {floatified:?}");
+        assert!(d.is_equal(&floatified)?);
         let img = img.to_luma8();
         assert_eq!(img.get_pixel(0, 0), &image::Luma([255]));
         assert_eq!(img.get_pixel(5, 0), &image::Luma([0]));
@@ -348,6 +401,8 @@ mod test {
             .to(&fp::DType::F32.into())?
             .div(&f32_255)?;
         assert!(d.is_equal(&v)?);
+        assert!(d.is_equal(&img.to_tensor()?.image_floatify(&Default::default())?)?);
+
         let img = img.to_rgb8();
         assert_eq!(img.get_pixel(0, 0), &image::Rgb([255, 0, 0]));
         assert_eq!(img.get_pixel(5, 0), &image::Rgb([0, 0, 255]));
@@ -373,6 +428,8 @@ mod test {
             .to(&fp::DType::F32.into())?
             .div(&f32_255)?;
         assert!(d.is_equal(&v)?);
+        assert!(d.is_equal(&img.to_tensor()?.image_floatify(&Default::default())?)?);
+
         let img = img.to_rgba8();
         // Transparent ones on the borders
         assert_eq!(img.get_pixel(0, 0), &image::Rgba([255, 0, 0, 0]));
@@ -389,7 +446,7 @@ mod test {
         let batched = d.unsqueeze(1)?;
         batched.save_image("/tmp/fp_rgba_f32_batch.png")?;
 
-        // These batches we can't really test... since we make a composite.
+        // These batches we can't really test with is_equals... since we make a composite.
         let mut d = Tensor::zeros(&[3, 3, 6, 6], &Default::default())?;
         d.i_mut((0, 0, 0..6, 0..6))?.fill_f64(1.0)?; // first image in batch red
         d.i_mut((1, 2, 0..6, 0..6))?.fill_f64(1.0)?; // second image in batch blue.
@@ -397,7 +454,7 @@ mod test {
         d.save_image("/tmp/fp_rgb_b2.png").unwrap();
         let img = image::ImageReader::open(&"/tmp/fp_rgb_b2.png")?.decode()?;
         assert!(matches!(img, image::DynamicImage::ImageRgb8(_)));
-        let back = Tensor::from_dynamic_image(&img)?;
+        let back = img.to_tensor()?;
         let square_255 = Tensor::ones(&[6, 6], &fp::DType::U8.into())?.mul(&u8_255)?;
         let square_0 = Tensor::zeros(&[6, 6], &fp::DType::U8.into())?.mul(&u8_255)?;
         // First square;
@@ -425,7 +482,7 @@ mod test {
 
         let img = image::ImageReader::open(&"/tmp/fp_rgb_2r_b2.png")?.decode()?;
         assert!(matches!(img, image::DynamicImage::ImageRgb8(_)));
-        let back = Tensor::from_dynamic_image(&img)?;
+        let back = img.to_tensor()?;
         // First square is red.
         let stacked = fp::torch::stack(&[&square_255, &square_0, &square_0], 0)?;
         assert!(back.i((.., 0..6, 0..6))?.is_equal(&stacked)?);
