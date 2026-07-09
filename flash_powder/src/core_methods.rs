@@ -1136,36 +1136,53 @@ mod test {
         /*
             #|PYTHON
             x = torch.tensor([1.0, 2.0, 3.0])
-            x2 = torch.tensor([0.0, 1.0, 0.0])
+            x2 = torch.tensor([0.0, 1.0, 6.0])
             added = x + x2
             sub = x - x2
         */
         let x: Tensor = [1.0, 2.0, 3.0].try_into()?;
         assert_eq!(x.f64s_ref()?, &[1.0, 2.0, 3.0]); // #PYTHON x.tolist()
-        let x2: Tensor = [0.0, 1.0, 0.0].try_into()?;
-        assert_eq!(x2.f64s_ref()?, &[0.0, 1.0, 0.0]); // #PYTHON x2.tolist()
+        let x2: Tensor = [0.0, 1.0, 6.0].try_into()?;
+        assert_eq!(x2.f64s_ref()?, &[0.0, 1.0, 6.0]); // #PYTHON x2.tolist()
 
         let added = x.add(&x2)?;
-        assert_eq!(added.f64s_ref()?, &[1.0f64, 3.0, 3.0]); // #PYTHON added.ravel().tolist()
+        assert_eq!(added.f64s_ref()?, &[1.0f64, 3.0, 9.0]); // #PYTHON added.ravel().tolist()
 
         let sub = x.sub(&x2)?;
-        assert_eq!(sub.f64s_ref()?, &[1.0f64, 1.0, 3.0]); // #PYTHON sub.ravel().tolist()
+        assert_eq!(sub.f64s_ref()?, &[1.0f64, 1.0, -3.0]); // #PYTHON sub.ravel().tolist()
 
         // And for integer, because that's broken :(
         /*
             #|PYTHON
             x = torch.tensor([1, 2, 3])
-            x2 = torch.tensor([0, 1, 0])
+            x2 = torch.tensor([0, 1, 6])
             added = x + x2
             sub = x - x2
         */
         let x: Tensor = [1, 2, 3].try_into()?;
-        let x2: Tensor = [0, 1, 0].try_into()?;
+        let x2: Tensor = [0, 1, 6].try_into()?;
         let added = x.add(&x2)?;
-        assert_eq!(added.i32s_ref()?, &[1i32, 3, 3]); // #PYTHON added.ravel().tolist()
+        assert_eq!(added.i32s_ref()?, &[1i32, 3, 9]); // #PYTHON added.ravel().tolist()
 
         let sub = x.sub(&x2)?;
-        assert_eq!(sub.i32s_ref()?, &[1i32, 1, 3]); // #PYTHON sub.ravel().tolist()
+        assert_eq!(sub.i32s_ref()?, &[1i32, 1, -3]); // #PYTHON sub.ravel().tolist()
+
+        // Test i8
+
+        /*
+            #|PYTHON
+            x = torch.tensor([1, 2, 3], dtype=torch.int8)
+            x2 = torch.tensor([0, 5, 0], dtype=torch.int8)
+            added = x + x2
+            sub = x - x2
+        */
+        let x: Tensor = [1i8, 2, 3].try_into()?;
+        let x2: Tensor = [0i8, 5, 0].try_into()?;
+        let added = x.add(&x2)?;
+        assert_eq!(added.i8s_ref()?, &[1i8, 7, 3]); // #PYTHON added.ravel().tolist()
+
+        let sub = x.sub(&x2)?;
+        assert_eq!(sub.i8s_ref()?, &[1i8, -3, 3]); // #PYTHON sub.ravel().tolist()
 
         // Also verify that we can do larger numbers and they don't get rounded on u8 or something silly.
         /*
@@ -1177,6 +1194,7 @@ mod test {
         */
         let x: Tensor = [(1i64 << 50), (1 << 62), 0].try_into()?;
         let x2: Tensor = [1337i64, 1337, 1337].try_into()?;
+
         let added = x.add(&x2)?;
         assert_eq!(
             added.i64s_ref()?,
