@@ -239,12 +239,18 @@ impl TensorFactory for Tensor {}
 pub type BlobDeleter =  fn(*mut std::ffi::c_void, *mut std::ffi::c_void);
 #[derive(Copy, Clone, Debug )]
 pub struct BlobOptionsBytes< 'b> {
+    /// The size of each dimension (in DType units), array length must match strides.
     pub sizes: &'b [usize],
+    /// The stride of each dimension (in DType units), array length must match sizes.
     pub strides: &'b [usize],
+    /// The data type represented by the bytes.
     pub dtype: DType,
+
     // Layout is usually strided.
     // pub layout: Layout,
-    pub device: Device,
+    // I don't think in Rust we can get a &[u8] that is not on the cpu side
+    // /// The device this data is on.
+    // pub device: Device,
 }
 
 pub trait TensorBorrowFactory {
@@ -295,8 +301,9 @@ impl<'c> TensorBorrowFactory for Ten<'c> {
         let strides_ptr: *const i64 = unsafe{ transmute(options.strides.as_ptr())};
         let storage_offset = 0;
         let dtype: i32 = options.dtype as _;
-        let device_type: i32 = options.device.device_type() as _;
-        let device_index : i32 = options.device.device_index().0;
+        let device = Device::CPU;
+        let device_type: i32 = device.device_type() as _;
+        let device_index : i32 = device.device_index().0;
         let mut handle_res: AtenTensorHandle = std::ptr::null_mut();
         let layout : i32 = Layout::Strided as _;
         let opaque_metadata : *const u8 = std::ptr::null();
@@ -390,16 +397,19 @@ mod test {
 
             let data = d.data()? ;
             let sizes = d.sizes();
+            assert_eq!(sizes, &[2,2]);
             let strides = d.strides();
+            assert_eq!(strides, &[2,1]);
             let options = BlobOptionsBytes{
                 sizes: sizes,
                 strides: strides,
                 dtype: d.dtype(),
-                device: d.device(),
             };
 
             let ten_thing = Ten::from_bytes(data, &options)?;
             println!("ten_thing: {ten_thing:?}");
+
+            assert!(d.is_equal(&ten_thing)?);
 
             Ok(())
 
