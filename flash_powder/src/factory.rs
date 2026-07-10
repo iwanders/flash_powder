@@ -276,18 +276,18 @@ impl<'c> TensorBorrowFactory for Ten<'c> {
              deleter_ctx: *mut c_void,
          ) -> AOTITorchError;
         */
-        let data : *const u8 = data.as_ptr();
-        let data_void: *mut std::ffi::c_void = unsafe{ transmute(data)};
+        let data_ptr : *const u8 = data.as_ptr();
+        let data_void: *mut std::ffi::c_void = unsafe{ transmute(data_ptr)};
         if options.strides.len() != options.sizes.len() {
             anyhow::bail!("strides and sizes should be equal length");
         }
 
         let element_size = unsafe{torch_stable::aoti_torch::aoti_torch_dtype_element_size(options.dtype as _)};
-        // todo:
-        //  Calculate if the data actually covers the entire possible span.
-        //  for now we pinkypromise it does lol
-
-
+        let last_position: usize = options.sizes.iter().zip(options.strides.iter()).map(|(size, stride)| (size - 1) * stride).sum();
+        let last_byte = last_position + element_size;
+        if data.len() < last_byte {
+            anyhow::bail!("the provided data length is not sufficient to read the last element at {last_position} of {element_size} bytes");
+        }
 
 
         let ndim: i64 = options.strides.len() as _;
@@ -385,10 +385,10 @@ mod test {
         #[test]
         fn test_flash_powder_ten_from_blob() -> StableTorchResult<()> {
 
+
             let d = Tensor::from(&[[1.0f32, 2.0], [3.0, 4.0]])?;
-            let z = d.const_data_ptr();
-            let len = d.data()?.len();
-            let data = unsafe{std::slice::from_raw_parts(z, len)};
+
+            let data = d.data()? ;
             let sizes = d.sizes();
             let strides = d.strides();
             let options = BlobOptionsBytes{

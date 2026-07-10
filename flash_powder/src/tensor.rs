@@ -63,17 +63,14 @@ impl Tensor {
 pub struct Ten<'a> {
     // This is the backing tensor that shares data with the 'parent'.
     tensor: StableTensor,
-    _parent: std::marker::PhantomData<&'a ()>,
+    parent: std::marker::PhantomData<&'a ()>,
 }
 impl<'a> Ten<'a> {
     pub fn new(parent: std::marker::PhantomData<&'a ()>, tensor: StableTensor) -> Self {
-        Self {
-            _parent: std::marker::PhantomData,
-            tensor,
-        }
+        Self { parent, tensor }
     }
     pub(crate) fn as_parent(&self) -> std::marker::PhantomData<&'a ()> {
-        self._parent
+        self.parent
     }
 }
 
