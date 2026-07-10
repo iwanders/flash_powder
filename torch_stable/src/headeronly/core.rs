@@ -148,29 +148,29 @@ impl TryFrom<i32> for Layout {
 #[allow(non_camel_case_types)]
 pub enum ScalarType {
     /// U8
-    Byte,
+    Byte, // Checked
     /// I8
-    Char,
+    Char, // Checked
     /// I16
-    Short,
+    Short, // Checked
     /// I32
-    Int,
+    Int, // Checked
     /// I64
-    Long,
+    Long, // Checked
     /// F16
-    Half,
+    Half, // Checked
     /// F32
-    Float,
+    Float, // Checked
     /// F64
-    Double,
+    Double, // Checked
     /// 32 bit complex with two F16 components.
-    ComplexHalf,
+    ComplexHalf, // Checked
     /// 64 bit complex with two F32 components.
-    ComplexFloat,
+    ComplexFloat, // Checked
     /// 128 bit complex with two F64 components,
-    ComplexDouble,
+    ComplexDouble, // Checked
     /// Boolean
-    Bool,
+    Bool, // Checked
     QInt8,
     QUInt8,
     QInt32,
@@ -184,13 +184,13 @@ pub enum ScalarType {
     Bits8,
     Bits16,
     /// 8-bit floating point, S-E-M 1-5-2
-    Float8_e5m2,
+    Float8_e5m2, // Checked
     /// 8-bit floating point, S-E-M 1-4-3
-    Float8_e4m3fn,
+    Float8_e4m3fn, // Checked
     /// 8-bit floating point, S-E-M 1-5-2
-    Float8_e5m2fnuz,
+    Float8_e5m2fnuz, // Checked
     /// 8-bit floating point, S-E-M 1-4-3
-    Float8_e4m3fnuz,
+    Float8_e4m3fnuz, // Checked
     /// U16
     UInt16,
     /// U32
@@ -212,12 +212,14 @@ pub enum ScalarType {
     Int6,
     Int7,
     /// 8-bit floating point, S-E-M 0-8-0
-    Float8_e8m0fnu,
+    Float8_e8m0fnu, // Checked
     /// packed 4-bit floating point, S-E-M 1-2-1
-    Float4_e2m1fn_x2,
+    Float4_e2m1fn_x2, // Checked
     Undefined,
     // NumOptions,
 }
+
+// https://github.com/pytorch/pytorch/blob/01d9abd0bb0eeea5416b0ceb75d243362cc90aee/torch/csrc/stable/stableivalue_conversions.h#L522
 
 impl TryFrom<i32> for ScalarType {
     type Error = anyhow::Error;
@@ -300,6 +302,107 @@ impl TryFrom<i32> for MemoryFormat {
             v if v == (MemoryFormat::ChannelsLast as i32) => Ok(MemoryFormat::ChannelsLast),
             v if v == (MemoryFormat::ChannelsLast3d as i32) => Ok(MemoryFormat::ChannelsLast3d),
             _ => Err(anyhow!("could not convert {} into ChannelsLast3d", value)),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_layout_conversion() {
+        unsafe {
+            assert_eq!(Layout::Strided as i32, aoti_torch_layout_strided());
+            assert_eq!(Layout::Sparse as i32, aoti_torch_layout_sparse_coo());
+            assert_eq!(Layout::SparseCsr as i32, aoti_torch_layout_sparse_csr());
+            assert_eq!(Layout::SparseCsc as i32, aoti_torch_layout_sparse_csc());
+            assert_eq!(Layout::SparseBsr as i32, aoti_torch_layout_sparse_bsr());
+            assert_eq!(Layout::SparseBsc as i32, aoti_torch_layout_sparse_bsc());
+            assert_eq!(Layout::Mkldnn as i32, aoti_torch_layout__mkldnn());
+            assert_eq!(Layout::Jagged as i32, aoti_torch_layout_jagged());
+        }
+    }
+
+    #[test]
+    fn test_format_conversion() {
+        unsafe {
+            assert_eq!(
+                MemoryFormat::Contiguous as i32,
+                aoti_torch_memory_format_contiguous_format()
+            );
+            assert_eq!(
+                MemoryFormat::Preserve as i32,
+                aoti_torch_memory_format_preserve_format()
+            );
+            assert_eq!(
+                MemoryFormat::ChannelsLast as i32,
+                aoti_torch_memory_format_channels_last()
+            );
+            assert_eq!(
+                MemoryFormat::ChannelsLast3d as i32,
+                aoti_torch_memory_format_channels_last_3d()
+            );
+        }
+    }
+
+    #[test]
+    fn test_scalartype_conversion() {
+        unsafe {
+            // Basic Integer Types
+            assert_eq!(ScalarType::Byte as i32, aoti_torch_dtype_uint8());
+            assert_eq!(ScalarType::Char as i32, aoti_torch_dtype_int8());
+            assert_eq!(ScalarType::Short as i32, aoti_torch_dtype_int16());
+            assert_eq!(ScalarType::Int as i32, aoti_torch_dtype_int32());
+            assert_eq!(ScalarType::Long as i32, aoti_torch_dtype_int64());
+
+            // Floating Point Types
+            assert_eq!(ScalarType::Half as i32, aoti_torch_dtype_float16());
+            assert_eq!(ScalarType::Float as i32, aoti_torch_dtype_float32());
+            assert_eq!(ScalarType::Double as i32, aoti_torch_dtype_float64());
+            assert_eq!(ScalarType::BFloat16 as i32, aoti_torch_dtype_bfloat16());
+
+            // Complex Types
+            assert_eq!(ScalarType::ComplexHalf as i32, aoti_torch_dtype_complex32());
+            assert_eq!(
+                ScalarType::ComplexFloat as i32,
+                aoti_torch_dtype_complex64()
+            );
+            assert_eq!(
+                ScalarType::ComplexDouble as i32,
+                aoti_torch_dtype_complex128()
+            );
+
+            // Boolean Type
+            assert_eq!(ScalarType::Bool as i32, aoti_torch_dtype_bool());
+
+            // Float8 / Eager8 Types
+            assert_eq!(
+                ScalarType::Float8_e5m2 as i32,
+                aoti_torch_dtype_float8_e5m2()
+            );
+            assert_eq!(
+                ScalarType::Float8_e4m3fn as i32,
+                aoti_torch_dtype_float8_e4m3fn()
+            );
+            assert_eq!(
+                ScalarType::Float8_e5m2fnuz as i32,
+                aoti_torch_dtype_float8_e5m2fnuz()
+            );
+            assert_eq!(
+                ScalarType::Float8_e4m3fnuz as i32,
+                aoti_torch_dtype_float8_e4m3fnuz()
+            );
+            assert_eq!(
+                ScalarType::Float8_e8m0fnu as i32,
+                aoti_torch_dtype_float8_e8m0fnu()
+            );
+
+            // Packed Float Types
+            assert_eq!(
+                ScalarType::Float4_e2m1fn_x2 as i32,
+                aoti_torch_dtype_float4_e2m1fn_x2()
+            );
         }
     }
 }

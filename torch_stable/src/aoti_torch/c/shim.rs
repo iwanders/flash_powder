@@ -20,8 +20,8 @@ unsafe extern "C" {
     pub unsafe fn aoti_torch_dtype_float8_e5m2fnuz() -> i32;
     pub unsafe fn aoti_torch_dtype_float8_e4m3fnuz() -> i32;
     // #if TORCH_FEATURE_VERSION >= TORCH_VERSION_2_12_0
-    // pub unsafe fn aoti_torch_dtype_float8_e8m0fnu() -> i32;
-    // pub unsafe fn aoti_torch_dtype_float4_e2m1fn_x2() -> i32;
+    pub unsafe fn aoti_torch_dtype_float8_e8m0fnu() -> i32;
+    pub unsafe fn aoti_torch_dtype_float4_e2m1fn_x2() -> i32;
     // #endif // TORCH_FEATURE_VERSION >= TORCH_VERSION_2_12_0
     pub unsafe fn aoti_torch_dtype_bfloat16() -> i32;
     pub unsafe fn aoti_torch_dtype_float16() -> i32;
