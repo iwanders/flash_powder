@@ -97,3 +97,26 @@ unsafe extern "C" {
     pub unsafe fn torch_delete_stable_ivalue(value_to_delete: *mut StableIValue) -> AOTITorchError;
 
 }
+
+pub type BlobDeleter = extern "C" fn(*mut c_void /* data */, *mut c_void /* ctx */);
+// https://github.com/pytorch/pytorch/blob/01d9abd0bb0eeea5416b0ceb75d243362cc90aee/torch/csrc/stable/c/shim.h#L167-L187
+// https://github.com/pytorch/pytorch/blob/01d9abd0bb0eeea5416b0ceb75d243362cc90aee/torch/csrc/stable/ops.h#L727-L811
+unsafe extern "C" {
+    pub unsafe fn torch_from_blob(
+        data: *mut c_void,
+        ndim: i64,
+        sizes_ptr: *const i64,
+        strides_ptr: *const i64,
+        storage_offset: i64,
+        dtype: i32,
+        device_type: i32,
+        device_index: i32,
+        ret: &mut AtenTensorHandle,
+        layout: i32,
+        opaque_metadata: *const u8,
+        opaque_metadata_size: i64,
+        deleter: BlobDeleter, // void (*deleter)(void* data, void* ctx),
+        deleter_ctx: *mut c_void,
+    ) -> AOTITorchError;
+
+}
