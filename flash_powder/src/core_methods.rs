@@ -58,7 +58,8 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
             length.into(),
         ];
         unsafe_call_dispatch_bail!("aten::narrow", "", stack.as_mut_slice());
-        Ok(Ten::new(self.get_tensor(), stack[0].try_into()?))
+        let marker = std::marker::PhantomData::<&'a ()>::default();
+        Ok(Ten::new(marker, stack[0].try_into()?))
     }
 
     /// Conver the tensor to another tensor, returning an owning copy.
@@ -108,7 +109,8 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         unsafe_call_dispatch_bail!("aten::view", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         assert_eq!(self.const_data_ptr(), r.const_data_ptr());
-        Ok(Ten::new(self.get_tensor(), r))
+        let marker = std::marker::PhantomData::<&'a ()>::default();
+        Ok(Ten::new(marker, r))
     }
 
     /// Get a non mutable view of this tensor.
@@ -314,12 +316,14 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L4675)
     /// - [tensor method](https://docs.pytorch.org/docs/2.11/generated/torch.Tensor.permute.html)
     /// - [pytorch method](https://docs.pytorch.org/docs/2.11/generated/torch.permute.html#torch-permute)
-    fn permute(&self, dims: &[usize]) -> StableTorchResult<Ten<'_>> {
+    fn permute<'a>(&'a self, dims: &[usize]) -> StableTorchResult<Ten<'a>> {
         let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), dims.into()];
         unsafe_call_dispatch_bail!("aten::permute", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         assert_eq!(self.const_data_ptr(), r.const_data_ptr());
-        Ok(Ten::new(self.get_tensor(), r))
+
+        let marker = std::marker::PhantomData::<&'a ()>::default();
+        Ok(Ten::new(marker, r))
     }
 
     /// Unsqueeze
@@ -327,12 +331,13 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L6658)
     /// - [tensor method](https://docs.pytorch.org/docs/2.11/generated/torch.Tensor.unsqueeze.html)
     /// - [pytorch method](https://docs.pytorch.org/docs/2.11/generated/torch.unsqueeze.html#torch.unsqueeze)
-    fn unsqueeze(&self, dim: isize) -> StableTorchResult<Ten<'_>> {
+    fn unsqueeze<'a>(&'a self, dim: isize) -> StableTorchResult<Ten<'a>> {
         let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), dim.into()];
         unsafe_call_dispatch_bail!("aten::unsqueeze", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         assert_eq!(self.const_data_ptr(), r.const_data_ptr());
-        Ok(Ten::new(self.get_tensor(), r))
+        let marker = std::marker::PhantomData::<&'a ()>::default();
+        Ok(Ten::new(marker, r))
     }
 
     /// Squeeze
@@ -345,7 +350,8 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         unsafe_call_dispatch_bail!("aten::squeeze", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         assert_eq!(self.const_data_ptr(), r.const_data_ptr());
-        Ok(Ten::new(self.get_tensor(), r))
+        let marker = std::marker::PhantomData::<&()>::default();
+        Ok(Ten::new(marker, r))
     }
     /// Squeeze
     ///
@@ -357,7 +363,8 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         unsafe_call_dispatch_bail!("aten::squeeze", "dim", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         assert_eq!(self.const_data_ptr(), r.const_data_ptr());
-        Ok(Ten::new(self.get_tensor(), r))
+        let marker = std::marker::PhantomData::<&()>::default();
+        Ok(Ten::new(marker, r))
     }
     /// Argmax
     ///

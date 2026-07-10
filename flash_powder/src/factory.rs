@@ -2,8 +2,7 @@
 //!
 //! Pytorch puts these in the module, as torch.zeros(), I chose to put them as static methods on Tensor.
 
-use crate::properties::TensorProperties;
-use crate::{StableTorchResult, Tensor, TensorAccess, dtype::DType};
+use crate::{StableTorchResult, Tensor, TensorAccess, dtype::DType, Ten};
 use torch_stable::aoti_torch::{aoti_torch_zero_, AtenTensorHandle};
 use torch_stable::headeronly::core::{Layout, MemoryFormat};
 use torch_stable::stable::device::Device;
@@ -99,7 +98,7 @@ impl_conversion!(Layout, TensorOptions, layout);
 ///   let a = Tensor::empty(&[5, 5], &Default::default()).unwrap();
 ///   assert_eq!(a.sizes(), &[5, 5]);
 /// ```
-pub trait TensorFactory: TensorAccess + TensorProperties {
+pub trait TensorFactory {
     /// A new empty vector
     ///
     ///
@@ -235,6 +234,103 @@ pub trait TensorFactory: TensorAccess + TensorProperties {
 }
 impl TensorFactory for Tensor {}
 
+
+// https://github.com/pytorch/pytorch/blob/01d9abd0bb0eeea5416b0ceb75d243362cc90aee/torch/csrc/stable/ops.h#L727-L811
+pub type BlobDeleter =  fn(*mut std::ffi::c_void, *mut std::ffi::c_void);
+#[derive(Copy, Clone, Debug )]
+pub struct BlobOptionsBytes< 'b> {
+    pub sizes: &'b [usize],
+    pub strides: &'b [usize],
+    pub dtype: DType,
+    // Layout is usually strided.
+    // pub layout: Layout,
+    pub device: Device,
+}
+
+pub trait TensorBorrowFactory {
+
+    /// Creates a tensor that uses the provided data pointer as its storage.
+    /// The tensor does not own the data, so the caller must ensure the data
+    /// remains valid for the lifetime of the tensor.
+    fn from_bytes<'d, 'b>(data: &'d [u8], options: &BlobOptionsBytes<  'b>) -> StableTorchResult<Ten<'d>>;
+}
+
+impl<'c> TensorBorrowFactory for Ten<'c> {
+    fn from_bytes<'d, 'b>(data: &'d [u8], options: &BlobOptionsBytes< 'b>) -> StableTorchResult<Ten<'d>> {
+        use std::mem::transmute;
+        /*
+           pub unsafe fn torch_from_blob(
+             data: *mut c_void,
+             ndim: i64,
+             sizes_ptr: *const i64,
+             strides_ptr: *const i64,
+             storage_offset: i64,
+             dtype: i32,
+             device_type: i32,
+             device_index: i32,
+             ret: &mut AtenTensorHandle,
+             layout: i32,
+             opaque_metadata: *const u8,
+             opaque_metadata_size: i64,
+             deleter: BlobDeleter, // void (*deleter)(void* data, void* ctx),
+             deleter_ctx: *mut c_void,
+         ) -> AOTITorchError;
+        */
+        let data : *const u8 = data.as_ptr();
+        let data_void: *mut std::ffi::c_void = unsafe{ transmute(data)};
+        if options.strides.len() != options.sizes.len() {
+            anyhow::bail!("strides and sizes should be equal length");
+        }
+
+        let element_size = unsafe{torch_stable::aoti_torch::aoti_torch_dtype_element_size(options.dtype as _)};
+        // todo:
+        //  Calculate if the data actually covers the entire possible span.
+        //  for now we pinkypromise it does lol
+
+
+
+
+        let ndim: i64 = options.strides.len() as _;
+        let sizes_ptr: *const i64 = unsafe{ transmute(options.sizes.as_ptr())};
+        let strides_ptr: *const i64 = unsafe{ transmute(options.strides.as_ptr())};
+        let storage_offset = 0;
+        let dtype: i32 = options.dtype as _;
+        let device_type: i32 = options.device.device_type() as _;
+        let device_index : i32 = options.device.device_index().0;
+        let mut handle_res: AtenTensorHandle = std::ptr::null_mut();
+        let layout : i32 = Layout::Strided as _;
+        let opaque_metadata : *const u8 = std::ptr::null();
+        let opaque_metadata_size : i64 = 0;
+        let deleter:  _ = None;
+        let deleter_ctx: *mut std::ffi::c_void = std::ptr::null_mut();
+
+        // With all the prep done, we can finally invoke the monster!
+        unsafe_call_bail!(
+            torch_stable::stable::c::torch_from_blob(
+                data_void ,
+                ndim ,
+                sizes_ptr ,
+                strides_ptr ,
+                storage_offset ,
+                dtype ,
+                device_type ,
+                device_index ,
+                &mut handle_res,
+                layout ,
+                opaque_metadata ,
+                opaque_metadata_size ,
+                deleter ,
+                deleter_ctx ,
+            )
+        );
+
+        // Ok(Ten::new( , StableTensor::from_handle(handle_res)))
+        let marker = std::marker::PhantomData::<&()>::default();
+        Ok(Ten::new(marker, StableTensor::from_handle(handle_res)))
+    }
+}
+
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -285,4 +381,27 @@ mod test {
         ); // #PYTHON list(b.view(-1).tolist())
         Ok(())
     }
+
+        #[test]
+        fn test_flash_powder_ten_from_blob() -> StableTorchResult<()> {
+
+            let d = Tensor::from(&[[1.0f32, 2.0], [3.0, 4.0]])?;
+            let z = d.const_data_ptr();
+            let len = d.data()?.len();
+            let data = unsafe{std::slice::from_raw_parts(z, len)};
+            let sizes = d.sizes();
+            let strides = d.strides();
+            let options = BlobOptionsBytes{
+                sizes: sizes,
+                strides: strides,
+                dtype: d.dtype(),
+                device: d.device(),
+            };
+
+            let ten_thing = Ten::from_bytes(data, &options)?;
+            println!("ten_thing: {ten_thing:?}");
+
+            Ok(())
+
+        }
 }

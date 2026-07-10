@@ -115,7 +115,7 @@ unsafe extern "C" {
         layout: i32,
         opaque_metadata: *const u8,
         opaque_metadata_size: i64,
-        deleter: BlobDeleter, // void (*deleter)(void* data, void* ctx),
+        deleter: Option<BlobDeleter>, // void (*deleter)(void* data, void* ctx),
         deleter_ctx: *mut c_void,
     ) -> AOTITorchError;
 

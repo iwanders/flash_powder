@@ -44,6 +44,10 @@ impl DeviceType {
             match self {
                 DeviceType::CPU => aoti_torch_device_type_cpu(),
                 DeviceType::CUDA => aoti_torch_device_type_cuda(),
+                DeviceType::Meta => aoti_torch_device_type_meta(),
+                DeviceType::XPU => aoti_torch_device_type_xpu(),
+                DeviceType::MPS => aoti_torch_device_type_mps(),
+                DeviceType::PrivateUse1 => aoti_torch_device_type_privateuse1(),
                 _ => todo!(),
             }
         }
@@ -309,6 +313,21 @@ impl TryFrom<i32> for MemoryFormat {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_device_type_conversion() {
+        unsafe {
+            assert_eq!(DeviceType::CPU as i32, aoti_torch_device_type_cpu());
+            assert_eq!(DeviceType::CUDA as i32, aoti_torch_device_type_cuda());
+            assert_eq!(DeviceType::Meta as i32, aoti_torch_device_type_meta());
+            assert_eq!(DeviceType::XPU as i32, aoti_torch_device_type_xpu());
+            assert_eq!(DeviceType::MPS as i32, aoti_torch_device_type_mps());
+            assert_eq!(
+                DeviceType::PrivateUse1 as i32,
+                aoti_torch_device_type_privateuse1()
+            );
+        }
+    }
 
     #[test]
     fn test_layout_conversion() {

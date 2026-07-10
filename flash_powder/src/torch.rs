@@ -10,12 +10,16 @@ use torch_stable::{
 ///
 /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L5898-L5922)
 /// - [pytorch equivalent](https://docs.pytorch.org/docs/2.12/generated/torch.select.html)
-pub fn select<T: TensorAccess>(input: &T, dim: usize, index: usize) -> StableTorchResult<Ten<'_>> {
+pub fn select<'a, T: TensorAccess>(
+    input: &'a T,
+    dim: usize,
+    index: usize,
+) -> StableTorchResult<Ten<'a>> {
     let mut stack: [StableIValue; 3] = [input.get_tensor().into(), dim.into(), index.into()];
     unsafe_call_dispatch_bail!("aten::select", "int", stack.as_mut_slice());
     let r: StableTensor = stack[0].try_into()?;
-
-    Ok(Ten::new(input.get_tensor(), r))
+    let marker = std::marker::PhantomData::<&'a ()>::default();
+    Ok(Ten::new(marker, r))
 }
 
 /// Concatenates a sequence of tensors along a new dimension.
