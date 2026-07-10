@@ -301,7 +301,7 @@ impl<'c> TensorBorrowFactory for Ten<'c> {
         let layout : i32 = Layout::Strided as _;
         let opaque_metadata : *const u8 = std::ptr::null();
         let opaque_metadata_size : i64 = 0;
-        let deleter:  _ = None;
+        let deleter  = None;
         let deleter_ctx: *mut std::ffi::c_void = std::ptr::null_mut();
 
         // With all the prep done, we can finally invoke the monster!
@@ -325,7 +325,7 @@ impl<'c> TensorBorrowFactory for Ten<'c> {
         );
 
         // Ok(Ten::new( , StableTensor::from_handle(handle_res)))
-        let marker = std::marker::PhantomData::<&()>::default();
+        let marker = std::marker::PhantomData::<&'d ()>::default();
         Ok(Ten::new(marker, StableTensor::from_handle(handle_res)))
     }
 }

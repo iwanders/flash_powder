@@ -58,7 +58,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
             length.into(),
         ];
         unsafe_call_dispatch_bail!("aten::narrow", "", stack.as_mut_slice());
-        let marker = std::marker::PhantomData::<&'a ()>::default();
+        let marker = std::marker::PhantomData::<&'a ()>;
         Ok(Ten::new(marker, stack[0].try_into()?))
     }
 
@@ -109,7 +109,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         unsafe_call_dispatch_bail!("aten::view", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         assert_eq!(self.const_data_ptr(), r.const_data_ptr());
-        let marker = std::marker::PhantomData::<&'a ()>::default();
+        let marker = std::marker::PhantomData::<&'a ()>;
         Ok(Ten::new(marker, r))
     }
 
@@ -322,7 +322,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         let r: StableTensor = stack[0].try_into()?;
         assert_eq!(self.const_data_ptr(), r.const_data_ptr());
 
-        let marker = std::marker::PhantomData::<&'a ()>::default();
+        let marker = std::marker::PhantomData::<&'a ()>;
         Ok(Ten::new(marker, r))
     }
 
@@ -336,7 +336,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         unsafe_call_dispatch_bail!("aten::unsqueeze", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         assert_eq!(self.const_data_ptr(), r.const_data_ptr());
-        let marker = std::marker::PhantomData::<&'a ()>::default();
+        let marker = std::marker::PhantomData::<&'a ()>;
         Ok(Ten::new(marker, r))
     }
 
@@ -350,7 +350,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         unsafe_call_dispatch_bail!("aten::squeeze", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         assert_eq!(self.const_data_ptr(), r.const_data_ptr());
-        let marker = std::marker::PhantomData::<&()>::default();
+        let marker = std::marker::PhantomData::<&()>;
         Ok(Ten::new(marker, r))
     }
     /// Squeeze
@@ -363,7 +363,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         unsafe_call_dispatch_bail!("aten::squeeze", "dim", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         assert_eq!(self.const_data_ptr(), r.const_data_ptr());
-        let marker = std::marker::PhantomData::<&()>::default();
+        let marker = std::marker::PhantomData::<&()>;
         Ok(Ten::new(marker, r))
     }
     /// Argmax
