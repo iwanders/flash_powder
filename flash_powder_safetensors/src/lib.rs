@@ -94,6 +94,7 @@ pub fn flash_powder_dtype_to_safetensor_dtype(v: fp::DType) -> safetensors::Dtyp
         flash_powder::DType::F8_e8m0fnu => safetensors::Dtype::F8_E8M0,
         flash_powder::DType::F4_e2m1fn_x2 => todo!(),
         flash_powder::DType::BF16 => todo!(),
+        flash_powder::DType::prevent_cast(()) => unreachable!(),
     }
 }
 
