@@ -1,8 +1,8 @@
 //! Holds the three Tensor types.
 use crate::StableTorchResult;
+use crate::core_methods::CoreMethods;
 use anyhow;
-use torch_stable::unsafe_call_dispatch_panic;
-use torch_stable::{aoti_torch::StableIValue, stable::tensor::Tensor as StableTensor};
+use torch_stable::stable::tensor::Tensor as StableTensor;
 
 /// A tensor, this owns its data.
 ///
@@ -13,7 +13,7 @@ pub struct Tensor {
     tensor: StableTensor,
 }
 impl Clone for Tensor {
-    /// This is a full owning clone, but lazy.
+    /// This is a full owning clone, but lazy, it only materializes when either the source or destination is written to.
     ///
     /// Under the hood this calls <https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L1278>, so the `_lazy_clone` kernel.
     ///
@@ -24,13 +24,12 @@ impl Clone for Tensor {
     /// Since clone can't fail in rust, I chose this because a lazy clone is unlikely to cause an out of memory error.
     ///
     /// It does mean that memory allocation errors are deffered to later in the program, but hopefully they can be handled there.
+    ///
+    /// This does not work for Ten's that are borrowed from byte slices through from blob.
+    ///
     fn clone(&self) -> Self {
         // Clone cannot throw... so we use a lazy clone; https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L1278
-        let mut stack: [StableIValue; 1] = [(&self.tensor).into()];
-        unsafe_call_dispatch_panic!("aten::_lazy_clone", "", stack.as_mut_slice());
-        let r: Tensor = Self::new(stack[0].try_into().unwrap());
-
-        r
+        self.lazy_clone().unwrap()
     }
 }
 
@@ -71,6 +70,10 @@ impl<'a> Ten<'a> {
     }
     pub(crate) fn as_parent(&self) -> std::marker::PhantomData<&'a ()> {
         self.parent
+    }
+
+    pub fn to_owned(&self) -> StableTorchResult<Tensor> {
+        self.to_tensor()
     }
 }
 

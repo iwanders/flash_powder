@@ -255,9 +255,12 @@ pub struct BlobOptionsBytes< 'b> {
 
 pub trait TensorBorrowFactory {
 
-    /// Creates a tensor that uses the provided data pointer as its storage.
-    /// The tensor does not own the data, so the caller must ensure the data
-    /// remains valid for the lifetime of the tensor.
+    /// Create a view of a tensor with data provided by the slice.
+    ///
+    /// From the docs:
+    /// > Creates a tensor that uses the provided data pointer as its storage. The tensor does not own the data, so the caller must ensure the data remains valid for the lifetime of the tensor.
+    ///
+    /// This Ten<'d> does not actually have a storage pointer, as such is cannot be lazily cloned and MUST be cloned with  [`CoreMethods::to_owned`][`crate::core_methods::CoreMethods::to_owned`].
     fn from_bytes<'d, 'b>(data: &'d [u8], options: &BlobOptionsBytes<  'b>) -> StableTorchResult<Ten<'d>>;
 }
 

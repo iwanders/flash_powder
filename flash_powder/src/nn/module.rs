@@ -117,19 +117,34 @@ impl StateDict {
 }
 
 pub trait StateDictAdaptor {
-    fn tensor(&self, name: &str) -> Option<Tensor>;
-    fn tensor_required(&self, name: &str) -> StableTorchResult<Tensor> {
-        self.tensor(name)
+    // fn tensor(&self, name: &str) -> Option<Tensor>;
+    fn ten<'d>(&'d self, name: &str) -> Option<Ten<'d>>;
+    // fn tensor_required(&self, name: &str) -> StableTorchResult<Tensor> {
+    //     self.tensor(name)
+    //         .ok_or(anyhow::format_err!("missing required tensor '{name}'"))
+    // }
+    fn ten_required<'d>(&'d self, name: &str) -> StableTorchResult<Ten<'d>> {
+        self.ten(name)
             .ok_or(anyhow::format_err!("missing required tensor '{name}'"))
     }
 }
 
 impl StateDictAdaptor for StateDict {
-    fn tensor(&self, name: &str) -> Option<Tensor> {
+    // fn tensor(&self, name: &str) -> Option<Tensor> {
+    //     if let Some(record) = self.map.get(name) {
+    //         match record {
+    //             Data::Parameter(tensor) => Some(tensor.clone()),
+    //             Data::Buffer(tensor) => Some(tensor.clone()),
+    //         }
+    //     } else {
+    //         None
+    //     }
+    // }
+    fn ten<'d>(&'d self, name: &str) -> Option<Ten<'d>> {
         if let Some(record) = self.map.get(name) {
             match record {
-                Data::Parameter(tensor) => Some(tensor.clone()),
-                Data::Buffer(tensor) => Some(tensor.clone()),
+                Data::Parameter(tensor) => tensor.ten().ok(),
+                Data::Buffer(tensor) => tensor.ten().ok(),
             }
         } else {
             None
@@ -173,10 +188,15 @@ impl<'a> StateDictReader for NamespacedStateDictAdaptor<'a> {
     }
 }
 impl<'a> StateDictAdaptor for NamespacedStateDictAdaptor<'a> {
-    fn tensor(&self, name: &str) -> Option<Tensor> {
+    fn ten<'d>(&'d self, name: &str) -> Option<Ten<'d>> {
         let m = self.namespace.join(".") + "." + name;
-        self.inner().tensor(&m)
+        self.inner().ten(&m)
     }
+
+    // fn tensor(&self, name: &str) -> Option<Tensor> {
+    //     let m = self.namespace.join(".") + "." + name;
+    //     self.inner().tensor(&m)
+    // }
 }
 
 #[derive(Debug, Default)]
@@ -381,7 +401,7 @@ pub trait Module: std::fmt::Debug + AsAny {
     /// Load a state dict into this layer.
     fn load_state_dict(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
         for (k, v) in self.tensors_mut().drain() {
-            *v = dict.tensor_required(&k)?;
+            *v = dict.ten_required(&k)?.to_owned()?;
         }
         Ok(())
     }
@@ -427,16 +447,22 @@ mod test {
         s.add_buffer("foo.bar", two.clone())?;
         s.add_buffer("foo.bar.buz", three.clone())?;
 
-        assert_eq!(s.tensor("foo").unwrap().as_f64()?, &1.0);
-        assert_eq!(s.tensor("foo.bar").unwrap().as_f64()?, &2.0);
-        assert_eq!(s.tensor("foo.bar.buz").unwrap().as_f64()?, &3.0);
+        // assert_eq!(s.tensor("foo").unwrap().as_f64()?, &1.0);
+        assert_eq!(s.ten("foo").unwrap().as_f64()?, &1.0);
+        // assert_eq!(s.tensor("foo.bar").unwrap().as_f64()?, &2.0);
+        assert_eq!(s.ten("foo.bar").unwrap().as_f64()?, &2.0);
+        // assert_eq!(s.tensor("foo.bar.buz").unwrap().as_f64()?, &3.0);
+        assert_eq!(s.ten("foo.bar.buz").unwrap().as_f64()?, &3.0);
 
         let foo = s.namespaced("foo");
-        assert_eq!(foo.tensor("bar").unwrap().as_f64()?, &2.0);
-        assert_eq!(foo.tensor("bar.buz").unwrap().as_f64()?, &3.0);
+        // assert_eq!(foo.tensor("bar").unwrap().as_f64()?, &2.0);
+        assert_eq!(foo.ten("bar").unwrap().as_f64()?, &2.0);
+        // assert_eq!(foo.tensor("bar.buz").unwrap().as_f64()?, &3.0);
+        assert_eq!(foo.ten("bar.buz").unwrap().as_f64()?, &3.0);
 
         let bar = foo.namespaced("bar");
-        assert_eq!(bar.tensor("buz").unwrap().as_f64()?, &3.0);
+        // assert_eq!(bar.tensor("buz").unwrap().as_f64()?, &3.0);
+        assert_eq!(bar.ten("buz").unwrap().as_f64()?, &3.0);
         Ok(())
     }
 

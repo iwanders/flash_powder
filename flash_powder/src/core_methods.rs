@@ -173,8 +173,28 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         Ok(r)
     }
 
+    /// Perform a full clone of the tensor, not a lazy one.
+    ///
+    /// This is different from [`Tensor::clone`], which calls [`Self::lazy_clone`] because this actually performs the
+    /// copy immediately. This is necessary in case we are copying from a Ten that does not own its data when it is
+    /// instantiated through [`TensorBorrowFactory::from_bytes`][`crate::factory::TensorBorrowFactory::from_bytes`].
+
+    fn to_tensor(&self) -> StableTorchResult<Tensor> {
+        let memory_format = MemoryFormat::Contiguous;
+        let memory_format_opt = Some(memory_format);
+        let mut stack: [StableIValue; 2] =
+            [(self.get_tensor()).into(), (&memory_format_opt).into()];
+        unsafe_call_dispatch_panic!("aten::clone", "", stack.as_mut_slice());
+        let r: Tensor = Tensor::new(stack[0].try_into().unwrap());
+        Ok(r)
+    }
+
     /// Lazily clone this into an owning tensor.
-    fn to_owned(&self) -> StableTorchResult<Tensor> {
+    ///
+    /// This only materializes the tensor if either the source or destination is written to.
+    ///
+    /// See also [`Self::to_tensor`] and [`Tensor::clone`]
+    fn lazy_clone(&self) -> StableTorchResult<Tensor> {
         let mut stack: [StableIValue; 1] = [(self.get_tensor()).into()];
         unsafe_call_dispatch_panic!("aten::_lazy_clone", "", stack.as_mut_slice());
         let r: Tensor = Tensor::new(stack[0].try_into().unwrap());
@@ -773,7 +793,7 @@ mod test {
         assert_eq!(a.f32s_mut()?[0], 50.0);
         assert_eq!(a.f32s_ref()?[0], 50.0);
 
-        let mut n = a.to_owned()?;
+        let mut n = a.lazy_clone()?;
         // Currently lazy copy
         let old_n_ptr = n.const_data_ptr();
         assert_eq!(n.const_data_ptr(), a.const_data_ptr());
@@ -792,7 +812,7 @@ mod test {
 
         // Try a non owning view
         let v = d.view(&[16])?;
-        let mut cv = v.to_owned()?;
+        let mut cv = v.lazy_clone()?;
         cv.f32s_mut()?[0] = 10.0;
         assert_eq!(cv.f32s_ref()?[0], 10.0);
         assert_eq!(v.f32s_ref()?[0], 50.0);
@@ -1094,7 +1114,7 @@ mod test {
         Ok(())
     }
     #[test]
-    fn test_flash_powder_copy_() -> StableTorchResult<()> {
+    fn test_flash_powder_copy_from_tensor() -> StableTorchResult<()> {
         // https://docs.pytorch.org/docs/2.12/generated/torch.squeeze.html#torch.squeeze
         /*
             #|PYTHON
@@ -1128,6 +1148,21 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    fn test_flash_powder_lazy_clone_to_owned() -> StableTorchResult<()> {
+        let x: Tensor = [1.0, 2.0, 3.0].try_into()?;
+        let x_clone = x.clone();
+        assert_eq!(x.const_data_ptr(), x_clone.const_data_ptr());
+        let x_lazy = x.lazy_clone()?;
+        assert_eq!(x.const_data_ptr(), x_lazy.const_data_ptr());
+        // And an owning clone.
+        let x_owned = x.to_tensor()?;
+        assert_ne!(x.const_data_ptr(), x_owned.const_data_ptr());
+
+        Ok(())
+    }
+
     #[test]
     fn test_flash_powder_core_method_index_tensor() -> StableTorchResult<()> {
         /*
