@@ -359,15 +359,25 @@ impl<'a> TensorImageOperations for fp::Ten<'a> {
 }
 
 pub trait FlatSamplesToTensor<Buffer> {
+    /// Return a flat samples object as a tensor.
+    ///
+    /// This does NOT permute it, so the channels are in the dimension they are in the image itself.
+    ///
+    /// For [`image::ImageBuffer`] with row major packed samples, this results in `[H, W, C]`.
     fn as_ten<'a, T>(&'a self) -> StableTorchResult<fp::Ten<'a>>
     where
         Buffer: AsRef<[T]>,
         T: zerocopy::IntoBytes + zerocopy::Immutable + 'a,
         T: fp::dtype::ScalarDType;
 
-    // fn to_tensor(&self) -> StableTorchResult<Tensor> {
-    //     self.as_ten()?.to_owned()
-    // }
+    fn to_tensor<'a, T>(&'a self) -> StableTorchResult<Tensor>
+    where
+        Buffer: AsRef<[T]>,
+        T: zerocopy::IntoBytes + zerocopy::Immutable + 'a,
+        T: fp::dtype::ScalarDType,
+    {
+        self.as_ten()?.to_owned()
+    }
 }
 impl<Buffer> FlatSamplesToTensor<Buffer> for image::flat::FlatSamples<Buffer> {
     fn as_ten<'a, T>(&'a self) -> StableTorchResult<flash_powder::Ten<'a>>
@@ -377,7 +387,7 @@ impl<Buffer> FlatSamplesToTensor<Buffer> for image::flat::FlatSamples<Buffer> {
         T: fp::dtype::ScalarDType,
     {
         use image::flat::NormalForm;
-        // The `ÌmageBuffer` uses row major form with packed samples.
+        // The `ImageBuffer` uses row major form with packed samples.
         // ImagePacked is C, H, W
         // RowMajorPacked is H, W, C (without gaps in C)
 
@@ -635,6 +645,10 @@ mod test {
         let as_ten = flat.as_ten()?;
         println!("ten: {as_ten:?}");
         println!("{:?}", as_ten.shape());
+
+        // Verify that is the same if we correct the channels.
+        let read_back = Tensor::read_image("/tmp/fp_rgb_f32_flat.png")?;
+        assert!(read_back.is_equal(&as_ten.permute(&[2, 0, 1])?)?);
 
         Ok(())
     }
