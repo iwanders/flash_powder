@@ -340,6 +340,7 @@ dependencies = [
  "flash_powder",
  "image",
  "torch_stable",
+ "zerocopy",
 ]
 
 [[package]]

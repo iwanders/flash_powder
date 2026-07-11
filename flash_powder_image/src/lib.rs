@@ -13,6 +13,7 @@ use fp::Tensor;
 use anyhow::bail;
 use flash_powder::prelude::*;
 pub use image;
+use zerocopy;
 
 use fp::StableTorchResult;
 
@@ -357,6 +358,63 @@ impl<'a> TensorImageOperations for fp::Ten<'a> {
     }
 }
 
+pub trait FlatSamplesToTensor<Buffer> {
+    fn as_ten<'a, T>(&'a self) -> StableTorchResult<fp::Ten<'a>>
+    where
+        Buffer: AsRef<[T]>,
+        T: zerocopy::IntoBytes + zerocopy::Immutable + 'a,
+        T: fp::dtype::ScalarDType;
+
+    // fn to_tensor(&self) -> StableTorchResult<Tensor> {
+    //     self.as_ten()?.to_owned()
+    // }
+}
+impl<Buffer> FlatSamplesToTensor<Buffer> for image::flat::FlatSamples<Buffer> {
+    fn as_ten<'a, T>(&'a self) -> StableTorchResult<flash_powder::Ten<'a>>
+    where
+        Buffer: AsRef<[T]>,
+        T: zerocopy::IntoBytes + zerocopy::Immutable + 'a,
+        T: fp::dtype::ScalarDType,
+    {
+        use image::flat::NormalForm;
+        // The `ÌmageBuffer` uses row major form with packed samples.
+        // ImagePacked is C, H, W
+        // RowMajorPacked is H, W, C (without gaps in C)
+
+        let image_buffer_reqs = self.layout.is_normal(NormalForm::PixelPacked)
+            && self.layout.is_normal(NormalForm::RowMajorPacked);
+
+        if image_buffer_reqs {
+            // This is H, W, C.
+            let sizes = &[
+                self.layout.height as _,
+                self.layout.width as _,
+                self.layout.channels as _,
+            ];
+            let height_stride = (self.layout.channels as usize)
+                .checked_mul(self.layout.width as usize)
+                .ok_or(anyhow::format_err!("too big"))?;
+            let strides = &[height_stride as _, self.layout.channels as _, 1];
+            let dtype = T::type_dtype();
+            dbg!(sizes);
+            dbg!(strides);
+
+            let options = fp::tensor::BlobOptionsBytes {
+                sizes,
+                strides,
+                dtype,
+            };
+            let slice: &'a [T] = self.samples.as_ref();
+
+            // Example utilizing zerocopy to read bytes safely
+            let byte_slice: &'a [u8] = zerocopy::IntoBytes::as_bytes(slice);
+            fp::Ten::from_bytes(byte_slice, &options)
+        } else {
+            bail!(" unsupported layout {:?}", self.layout);
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
 
@@ -552,6 +610,31 @@ mod test {
         assert_eq!(d.f32_ref(&[0, 0])?, &1.0);
         assert_eq!(d.f32_ref(&[5, 0])?, &0.0);
         assert_eq!(d.f32_ref(&[5, 4])?, &0.5);
+
+        Ok(())
+    }
+    #[test]
+    fn test_image_flat_buffer() -> StableTorchResult<()> {
+        // Test an rgba image.
+        let mut d = Tensor::zeros(&[3, 6, 6], &Default::default())?;
+        // Top left, R
+        d.i_mut((0, 0..3, 0..3))?.fill_f64(1.0)?;
+        // Bottom left, G
+        d.i_mut((1, 3..6, 0..3))?.fill_f64(1.0)?;
+        // Top right Blue
+        d.i_mut((2, 0..3, 3..6))?.fill_f64(1.0)?;
+        // Bottom right, white, this also sets the full opacity.
+        d.i_mut((.., 3..6, 3..6))?.fill_f64(1.0)?;
+        d.save_image("/tmp/fp_rgb_f32_flat.png")?;
+        let img = image::ImageReader::open(&"/tmp/fp_rgb_f32_flat.png")?
+            .decode()?
+            .to_rgb8();
+        let flat = img.as_flat_samples();
+        println!("{:?}", flat);
+
+        let as_ten = flat.as_ten()?;
+        println!("ten: {as_ten:?}");
+        println!("{:?}", as_ten.shape());
 
         Ok(())
     }
