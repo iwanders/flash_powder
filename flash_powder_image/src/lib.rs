@@ -368,12 +368,14 @@ pub trait FlatSamplesToTensor<Buffer> {
     where
         Buffer: AsRef<[T]>,
         T: zerocopy::IntoBytes + zerocopy::Immutable + 'a,
+        T: std::fmt::Debug,
         T: fp::dtype::ScalarDType;
 
     fn to_tensor<'a, T>(&'a self) -> StableTorchResult<Tensor>
     where
         Buffer: AsRef<[T]>,
         T: zerocopy::IntoBytes + zerocopy::Immutable + 'a,
+        T: std::fmt::Debug,
         T: fp::dtype::ScalarDType,
     {
         self.as_ten()?.to_owned()
@@ -384,6 +386,7 @@ impl<Buffer> FlatSamplesToTensor<Buffer> for image::flat::FlatSamples<Buffer> {
     where
         Buffer: AsRef<[T]>,
         T: zerocopy::IntoBytes + zerocopy::Immutable + 'a,
+        T: std::fmt::Debug,
         T: fp::dtype::ScalarDType,
     {
         use image::flat::NormalForm;
@@ -401,13 +404,12 @@ impl<Buffer> FlatSamplesToTensor<Buffer> for image::flat::FlatSamples<Buffer> {
                 self.layout.width as _,
                 self.layout.channels as _,
             ];
-            let height_stride = (self.layout.channels as usize)
-                .checked_mul(self.layout.width as usize)
-                .ok_or(anyhow::format_err!("too big"))?;
-            let strides = &[height_stride as _, self.layout.channels as _, 1];
+            let strides = &[
+                self.layout.height_stride as _,
+                self.layout.width_stride as _,
+                self.layout.channel_stride as _,
+            ];
             let dtype = T::type_dtype();
-            dbg!(sizes);
-            dbg!(strides);
 
             let options = fp::tensor::BlobOptionsBytes {
                 sizes,
@@ -415,9 +417,23 @@ impl<Buffer> FlatSamplesToTensor<Buffer> for image::flat::FlatSamples<Buffer> {
                 dtype,
             };
             let slice: &'a [T] = self.samples.as_ref();
-
             // Example utilizing zerocopy to read bytes safely
             let byte_slice: &'a [u8] = zerocopy::IntoBytes::as_bytes(slice);
+
+            println!(
+                "Passing tensor blob options: {options:?} with byte slice length: {}",
+                byte_slice.len()
+            );
+
+            let min_length = self
+                .layout
+                .min_length()
+                .ok_or(anyhow::format_err!("too big"))?;
+            dbg!(min_length);
+            if min_length > slice.len() {
+                bail!("layout can't fit in length")
+            }
+
             fp::Ten::from_bytes(byte_slice, &options)
         } else {
             bail!(" unsupported layout {:?}", self.layout);
@@ -640,15 +656,32 @@ mod test {
             .decode()?
             .to_rgb8();
         let flat = img.as_flat_samples();
-        println!("{:?}", flat);
-
         let as_ten = flat.as_ten()?;
-        println!("ten: {as_ten:?}");
-        println!("{:?}", as_ten.shape());
+        assert_eq!(&as_ten.shape(), &[6, 6, 3]);
 
         // Verify that is the same if we correct the channels.
         let read_back = Tensor::read_image("/tmp/fp_rgb_f32_flat.png")?;
         assert!(read_back.is_equal(&as_ten.permute(&[2, 0, 1])?)?);
+
+        let as_ten_u16 = as_ten.to(&fp::DType::U16.into())?;
+
+        let as_img_u16 = as_ten_u16
+            .permute(&[2, 0, 1])?
+            .to_dynamic_image()?
+            .to_rgb16();
+        as_img_u16.save("/tmp/foo.png")?;
+        let flat_u16 = as_img_u16.as_flat_samples();
+        let interpret_ten_u16 = flat_u16.as_ten()?;
+        let i32_255: Tensor = 255i32.try_into()?;
+        let i32_65535: Tensor = 65535i32.try_into()?;
+
+        // Do the comparison, to verify the u16 stuff also worked.
+        let interpret_ten_u16_i32 = interpret_ten_u16.to(&fp::DType::I32.into())?;
+        let back_to_255 = interpret_ten_u16_i32.div(&i32_65535)?;
+        let as_ten_u16_as_i32 = as_ten_u16.to(&fp::DType::I32.into())?;
+        let ten_to_255 = as_ten_u16_as_i32.div(&i32_255)?;
+
+        assert!(back_to_255.is_equal(&ten_to_255)?);
 
         Ok(())
     }
