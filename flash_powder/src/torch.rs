@@ -18,7 +18,7 @@ pub fn select<'a, T: TensorAccess>(
     let mut stack: [StableIValue; 3] = [input.get_tensor().into(), dim.into(), index.into()];
     unsafe_call_dispatch_bail!("aten::select", "int", stack.as_mut_slice());
     let r: StableTensor = stack[0].try_into()?;
-    let marker = std::marker::PhantomData::<&'a ()>::default();
+    let marker = std::marker::PhantomData::<&'a ()>;
     Ok(Ten::new(marker, r))
 }
 

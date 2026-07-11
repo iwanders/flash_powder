@@ -248,8 +248,8 @@ impl TryFrom<StableIValue> for Vec<StableIValue> {
         let handle_res: StableListHandle = value.0 as _;
         unsafe_call_bail!(torch_list_size(handle_res, &mut size_retrieved));
         let mut res: Vec<StableIValue> = vec![StableIValue(0); size_retrieved];
-        for i in 0..size_retrieved {
-            unsafe_call_bail!(torch_list_get_item(handle_res, i, &mut res[i]));
+        for (i, item) in res.iter_mut().enumerate().take(size_retrieved) {
+            unsafe_call_bail!(torch_list_get_item(handle_res, i, item));
         }
         // Now that we have copied the values, we need to delete the list.
         unsafe_call_bail!(torch_delete_list(handle_res));

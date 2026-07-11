@@ -102,7 +102,6 @@ impl<'a> Ten<'a> {
     /// > Creates a tensor that uses the provided data pointer as its storage. The tensor does not own the data, so the caller must ensure the data remains valid for the lifetime of the tensor.
     ///
     /// This Ten<'d> does not actually have a storage pointer, as such is cannot be lazily cloned and MUST be cloned with  [`CoreMethods::to_tensor`][`crate::core_methods::CoreMethods::to_tensor`].
-
     pub fn from_bytes<'d, 'b>(
         data: &'d [u8],
         options: &BlobOptionsBytes<'b>,
@@ -179,8 +178,7 @@ impl<'a> Ten<'a> {
             deleter_ctx,
         ));
 
-        // Ok(Ten::new( , StableTensor::from_handle(handle_res)))
-        let marker = std::marker::PhantomData::<&'d ()>::default();
+        let marker = std::marker::PhantomData::<&'d ()>;
         Ok(Ten::new(marker, StableTensor::from_handle(handle_res)))
     }
 }
@@ -276,8 +274,6 @@ mod test {
         };
 
         let ten_thing = Ten::from_bytes(data, &options)?;
-        println!("ten_thing: {ten_thing:?}");
-
         assert!(d.is_equal(&ten_thing)?);
 
         Ok(())

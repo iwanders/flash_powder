@@ -178,7 +178,6 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     /// This is different from [`Tensor::clone`], which calls [`Self::lazy_clone`] because this actually performs the
     /// copy immediately. This is necessary in case we are copying from a Ten that does not own its data when it is
     /// instantiated through [`Ten::from_bytes`] .
-
     fn to_tensor(&self) -> StableTorchResult<Tensor> {
         let memory_format = MemoryFormat::Contiguous;
         let memory_format_opt = Some(memory_format);
@@ -278,9 +277,9 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         let tensor2_array: &[StableIValue] = &[(one.get_tensor()).into()];
         let scalars: Tensor = [1u8].try_into()?;
         let mut stack: [StableIValue; 4] = [
-            (&self_array[..]).into(),
-            (&other_array[..]).into(),
-            (&tensor2_array[..]).into(),
+            self_array.into(),
+            other_array.into(),
+            tensor2_array.into(),
             scalars.get_tensor().into(),
         ];
         unsafe_call_dispatch_panic!("aten::_foreach_addcmul", "Tensor", stack.as_mut_slice());
@@ -315,9 +314,9 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         let tensor2_array: &[StableIValue] = &[(one.get_tensor()).into()];
         let scalars: Tensor = [-1i8].try_into()?;
         let mut stack: [StableIValue; 4] = [
-            (&self_array[..]).into(),
-            (&other_array[..]).into(),
-            (&tensor2_array[..]).into(),
+            self_array.into(),
+            other_array.into(),
+            tensor2_array.into(),
             scalars.get_tensor().into(),
         ];
         unsafe_call_dispatch_panic!("aten::_foreach_addcmul", "Tensor", stack.as_mut_slice());
