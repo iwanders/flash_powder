@@ -177,7 +177,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     ///
     /// This is different from [`Tensor::clone`], which calls [`Self::lazy_clone`] because this actually performs the
     /// copy immediately. This is necessary in case we are copying from a Ten that does not own its data when it is
-    /// instantiated through [`TensorBorrowFactory::from_bytes`][`crate::factory::TensorBorrowFactory::from_bytes`].
+    /// instantiated through [`Ten::from_bytes`] .
 
     fn to_tensor(&self) -> StableTorchResult<Tensor> {
         let memory_format = MemoryFormat::Contiguous;

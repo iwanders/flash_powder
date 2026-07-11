@@ -142,7 +142,7 @@ pub fn safetensor_to_ten<'d>(
             current_stride *= sizes[i];
         }
 
-        let options = fp::factory::BlobOptionsBytes {
+        let options = fp::tensor::BlobOptionsBytes {
             sizes,
             strides: &strides,
             dtype,

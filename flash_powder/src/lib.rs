@@ -82,7 +82,7 @@ pub mod prelude {
     #[doc(inline)]
     pub use data::{DataMut, DataRef};
     #[doc(inline)]
-    pub use factory::{TensorBorrowFactory, TensorFactory};
+    pub use factory::TensorFactory;
     #[doc(inline)]
     pub use properties::{TensorProperties, TensorPropertiesMut};
     // #[doc(inline)]
