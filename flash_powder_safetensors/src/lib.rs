@@ -31,11 +31,8 @@
 //!# }
 //! ```
 //!
-
-// Todo, use a borrowed blob; https://github.com/pytorch/pytorch/blob/6a641f6777594fcd2f34ea32f7ee2c0cdaa55776/torch/csrc/stable/ops.h#L680-L725
-
 use flash_powder as fp;
-use fp::Tensor;
+use fp::Ten;
 use fp::nn;
 
 use anyhow::bail;
@@ -125,6 +122,39 @@ pub fn safetensor_to_tensor(
     }
 }
 
+/// Extract a [`fp::Tensor`] from an [`SafeTensors`] by name, without copying the data.
+///
+/// Tensor is on the cpu and borrowing from the [`SafeTensors`] object.
+pub fn safetensor_to_ten<'d>(
+    tensors: &'d SafeTensors,
+    name: &'_ str,
+) -> Result<fp::Ten<'d>, anyhow::Error> {
+    if let Ok(tensor_view) = tensors.tensor(name) {
+        let dtype = safetensor_dtype_to_flash_powder_dtype(tensor_view.dtype());
+        let sizes = tensor_view.shape();
+        // Next we need to calculate stride.
+        let mut strides = vec![0; sizes.len()];
+        let mut current_stride = 1;
+
+        // Iterate backwards from the last dimension to the first
+        for i in (0..sizes.len()).rev() {
+            strides[i] = current_stride;
+            current_stride *= sizes[i];
+        }
+
+        let options = fp::factory::BlobOptionsBytes {
+            sizes,
+            strides: &strides,
+            dtype,
+        };
+        let data = tensor_view.data();
+
+        // Copy the bytes.
+        fp::Ten::from_bytes(data, &options)
+    } else {
+        bail!("could not find safetensor {name}")
+    }
+}
 /// Adaptor struct that implements [`flash_powder::nn::StateDictReader`].
 #[derive(Copy, Clone, Debug)]
 pub struct SafetensorReader<'a, 'd> {
@@ -137,8 +167,8 @@ impl<'a, 'd> SafetensorReader<'a, 'd> {
 }
 
 impl<'a, 'd> nn::StateDictAdaptor for SafetensorReader<'a, 'd> {
-    fn tensor(&self, name: &str) -> Option<Tensor> {
-        safetensor_to_tensor(self.st, name).ok()
+    fn ten(&self, name: &str) -> Option<Ten<'a>> {
+        safetensor_to_ten(self.st, name).ok()
     }
 }
 impl<'a, 'd> nn::StateDictReader for SafetensorReader<'a, 'd> {
