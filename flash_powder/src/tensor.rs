@@ -127,19 +127,24 @@ impl<'a> Ten<'a> {
         */
         let data_ptr: *const u8 = data.as_ptr();
         let data_void: *mut std::ffi::c_void = unsafe { transmute(data_ptr) };
+        dbg!(data_ptr, data_void, data.len());
         if options.strides.len() != options.sizes.len() {
             anyhow::bail!("strides and sizes should be equal length");
         }
-
-        let element_size =
-            unsafe { torch_stable::aoti_torch::aoti_torch_dtype_element_size(options.dtype as _) };
+        let options_scalartype: torch_stable::headeronly::core::ScalarType = options.dtype.into();
+        let element_size = unsafe {
+            torch_stable::aoti_torch::aoti_torch_dtype_element_size(options_scalartype as _)
+        };
+        dbg!(options.dtype);
+        dbg!(element_size);
         let last_position: usize = options
             .sizes
             .iter()
             .zip(options.strides.iter())
             .map(|(size, stride)| (size - 1) * stride)
             .sum();
-        let last_byte = last_position + element_size;
+        let last_byte = (last_position * element_size) + element_size;
+        dbg!(last_byte);
         if data.len() < last_byte {
             anyhow::bail!(
                 "the provided data length is not sufficient to read the last element at {last_position} of {element_size} bytes"
@@ -149,7 +154,7 @@ impl<'a> Ten<'a> {
         let sizes_ptr: *const i64 = unsafe { transmute(options.sizes.as_ptr()) };
         let strides_ptr: *const i64 = unsafe { transmute(options.strides.as_ptr()) };
         let storage_offset = 0;
-        let dtype: i32 = options.dtype as _;
+        let dtype: i32 = options_scalartype as _;
         let device = Device::CPU;
         let device_type: i32 = device.device_type() as _;
         let device_index: i32 = device.device_index().0;
@@ -272,9 +277,56 @@ mod test {
             strides: strides,
             dtype: d.dtype(),
         };
+        assert_eq!(options.dtype, DType::F32);
 
         let ten_thing = Ten::from_bytes(data, &options)?;
         assert!(d.is_equal(&ten_thing)?);
+
+        let u8_3x2 = Tensor::from(&[[1u8, 2], [3, 4], [5, 6]])?;
+        println!("tensor: {:?}, shape: {:?}", u8_3x2, u8_3x2.shape());
+        println!(
+            "sizes: {:?}, strides: {:?}",
+            u8_3x2.sizes(),
+            u8_3x2.strides()
+        );
+
+        let data = [1, 2, 3, 4, 5, 6u8];
+        let sizes = &[3, 2];
+        let strides = &[2, 1];
+        let options = BlobOptionsBytes {
+            sizes: sizes,
+            strides: strides,
+            dtype: DType::U8,
+        };
+
+        let ten_3x2x1 = Ten::from_bytes(&data, &options)?;
+        assert_eq!(&ten_3x2x1.shape(), &[3, 2]);
+
+        let u32_3x2 = Tensor::from(&[[1u32, 2], [3, 4], [5, 6]])?;
+        println!("tensor: {:?}, shape: {:?}", u32_3x2, u32_3x2.shape());
+        println!(
+            "sizes: {:?}, strides: {:?}",
+            u32_3x2.sizes(),
+            u32_3x2.strides()
+        );
+        let data = u32_3x2.data()?;
+        println!("data: {data:?}");
+        let sizes = &[3, 2];
+        let strides = &[2, 1];
+        let options = BlobOptionsBytes {
+            sizes: sizes,
+            strides: strides,
+            dtype: DType::U32,
+        };
+        let ten_u16_3x2 = Ten::from_bytes(&data, &options)?;
+        println!(
+            "ten_u16_3x2: {:?}, shape: {:?}",
+            ten_u16_3x2,
+            ten_u16_3x2.shape()
+        );
+
+        assert_eq!(&ten_u16_3x2.shape(), &[3, 2]);
+        assert!(ten_u16_3x2.is_equal(&u32_3x2)?);
 
         Ok(())
     }

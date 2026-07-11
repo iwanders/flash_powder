@@ -32,7 +32,6 @@ impl_tensor_scalar_dtype_trait!(bool, DType::Bool);
 /// The [`ScalarType`] contains many entries that are not in <https://docs.pytorch.org/docs/2.12/tensor_attributes.html>
 /// as well as having the legacy byte/char like naming, by introducing this indirection things are nice and uniform.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
-#[repr(i8)]
 #[allow(non_camel_case_types)]
 pub enum DType {
     /// U8
@@ -95,6 +94,10 @@ pub enum DType {
     ///
     /// This type is unprintable!
     BF16,
+
+    // This is here to prevent casting the enum to integers, since that MUST go through ScalarType.
+    #[doc(hidden)]
+    __prevent_cast(()),
 }
 
 impl From<DType> for ScalarType {
@@ -122,6 +125,7 @@ impl From<DType> for ScalarType {
             DType::F8_e4m3fnuz => ScalarType::Float8_e4m3fnuz,
             DType::F8_e8m0fnu => ScalarType::Float8_e8m0fnu,
             DType::F4_e2m1fn_x2 => ScalarType::Float4_e2m1fn_x2,
+            __prevent_cast => unreachable!(),
         }
     }
 }
