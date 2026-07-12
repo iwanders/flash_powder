@@ -13,7 +13,6 @@ use fp::Tensor;
 use anyhow::bail;
 use flash_powder::prelude::*;
 pub use image;
-use zerocopy;
 
 use fp::StableTorchResult;
 

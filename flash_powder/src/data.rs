@@ -68,7 +68,10 @@ pub trait DataRef: TensorAccess + TensorProperties {
         if z.is_cpu() {
             Ok(unsafe { std::slice::from_raw_parts(data_ptr, z.storage_size()) })
         } else {
-            bail!("tensor must be on cpu to access slice")
+            bail!(
+                "tensor is on {:?}, move to the cpu to access slice",
+                z.device()
+            )
         }
     }
 

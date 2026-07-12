@@ -9,7 +9,7 @@ This is mostly my project to gain a better understanding of how (lib/py)torch wo
 The stable ABI doesn't expose all functionality of libtorch, but a surprising amount of functionality is available,
 especially if the goal is just to do inference. The [example_vgg](./example_vgg) crate holds an implementation of vgg11.
 
-This was developed for doing inference with an U-net in my [overlay_segmenter](https://github.com/iwanders/overlay_segmenter/).
+This was developed for doing inference with an U-Net in my [overlay_segmenter](https://github.com/iwanders/overlay_segmenter/).
 
 ### Approach
 
@@ -135,7 +135,7 @@ let img = Tensor::read_image("super_cool_image.png")?; // [C, H, W], DType::U8, 
 img.save_image("/tmp/it_was_really_cool.png")?;  // Expects [C, H, W], DType::U8 in [0, 255], or float in [0, 1.0].
 ```
 
-It also handles `[B, C, H, W`], which creates a row of images, and `[V, B, C, H, W]` to vertically stack batched image rows.
+It also handles `[B, C, H, W]`, which creates a row of images, and `[V, B, C, H, W]` to vertically stack batched image rows.
 
 
 
@@ -163,16 +163,16 @@ The `v2_13` feature was removed in [`fdb282`](https://github.com/iwanders/flash_
 ## Testing
 
 I want to ensure that the tensors & function arguments follow conventions from the Python side, so there's a heavy emphasis
-of testing all functions against their Python equivalents. The Python code to test against is interwoven with the Rust
+on testing all functions against their Python equivalents. The Python code to test against is interwoven with the Rust
 code with some helper tooling. Tests should run cleanly in valgrind.
 
 ### Python truth
 
-For tests, the equivalent Python PyTorch execution is considered the ground truth and the Rust should should produce the
+For tests, the equivalent Python PyTorch execution is considered the ground truth and the Rust should produce the
 same values.
 To be able to easily create reference values in the tests there's a helper tool in `./util/python_truth.py` that can
 execute python code in rusts' comment blocks and update values in the rust tests accordingly.
-This ensurse that the equivalent python code is next to the rust code in the unit tests and also facilitates automatic
+This ensures that the equivalent python code is next to the rust code in the unit tests and also facilitates automatic
 generation of reference values without manual copy pasting which may introduce errors.
 
 The scope of a particular Python execution is limited to within a (test) function scope;
