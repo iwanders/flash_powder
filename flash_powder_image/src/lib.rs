@@ -18,7 +18,9 @@ use zerocopy;
 use fp::StableTorchResult;
 
 pub mod prelude {
-    pub use super::{ImageToTensor, TensorFromImage, TensorImageOperations, TensorToImage};
+    pub use super::{
+        FlatSamplesToTensor, ImageToTensor, TensorFromImage, TensorImageOperations, TensorToImage,
+    };
 }
 
 pub trait TensorToImage {

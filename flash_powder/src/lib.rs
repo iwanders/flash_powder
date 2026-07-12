@@ -91,14 +91,8 @@ pub mod prelude {
     #[doc(inline)]
     pub use index::{TensorIndex, TensorIndexMut};
 
-    // #[doc(inline)]
-    // pub use super::torch;
-    // #[doc(inline)]
-    // pub use crate::functional;
-    //
-
-    // #[doc(inline)]
-    // pub use super::dtype::DType;
+    #[doc(inline)]
+    pub use nn::{Module, StateDictAdaptor, StateDictReader};
 }
 
 #[cfg(test)]
