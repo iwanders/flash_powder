@@ -157,7 +157,7 @@ use case with [this comment](https://github.com/pytorch/pytorch/issues/174507#is
 a followup [issue](https://github.com/pytorch/pytorch/issues/179427) around lack of error retrieval functionality was created.
 The proposed changes were incorporated [in this PR](https://github.com/pytorch/pytorch/pull/180135), and improved in a [followup](https://github.com/pytorch/pytorch/pull/183823).
 The lack of allocator/deleter for `StableIValue` was addressed [in this PR](https://github.com/pytorch/pytorch/pull/179421).
-
+The `v2_13` feature was removed in [`fdb282`](https://github.com/iwanders/flash_powder/commit/fdb282381e3fd7458008a69fa04208dfcfad688d), the stable ivalue creation workaround in [`60b505fd1`](https://github.com/iwanders/flash_powder/commit/60b505fd17c5b3ab1f45f6b2bfe3aa85cc4d2d1f), with these reinstated it could run on older versions.
 
 
 ## Testing
