@@ -425,6 +425,20 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         let r: StableTensor = stack[0].try_into()?;
         Ok(Tensor::new(r))
     }
+
+    /// Flip
+    ///
+    /// Reverse the order of an n-D tensor along given axis in dims.
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L6066-L6072)
+    /// - [tensor method](https://docs.pytorch.org/docs/2.13/generated/torch.Tensor.flip.html)
+    /// - [pytorch method](https://docs.pytorch.org/docs/2.13/generated/torch.flip.html)
+    fn flip(&self, dims: &[usize]) -> StableTorchResult<Tensor> {
+        let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), (dims).into()];
+        unsafe_call_dispatch_bail!("aten::flip", "", stack.as_mut_slice());
+        let r: StableTensor = stack[0].try_into()?;
+        Ok(Tensor::new(r))
+    }
 }
 impl CoreMethods for Tensor {}
 impl<'a> CoreMethods for Ten<'a> {}
@@ -1298,6 +1312,24 @@ mod test {
         let max = x.max()?;
         assert_eq!(min.f64s_ref()?, &[1.0]); // #PYTHON min.tolist()
         assert_eq!(max.f64s_ref()?, &[3.0]); // #PYTHON max.tolist()
+
+        Ok(())
+    }
+    #[test]
+    fn test_flash_powder_flip() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            x = torch.tensor(list(range(1,9)), dtype=torch.int64).reshape([2,2,2])
+            f = torch.flip(x, [0, 1])
+        */
+        let d = Tensor::from(&[1i64, 2, 3, 4, 5, 6, 7, 8])?;
+        let x = d.view(&[2, 2, 2])?;
+        assert_eq!(x.i64s_ref()?, &[1, 2, 3, 4, 5, 6, 7, 8]); // #PYTHON x.ravel().tolist()
+        assert_eq!(x.sizes(), &[2, 2, 2]); // #PYTHON list(x.shape)
+
+        let f = x.flip(&[0, 1])?;
+        assert_eq!(f.i64s_ref()?, &[7, 8, 5, 6, 3, 4, 1, 2]); // #PYTHON f.ravel().tolist()
+        assert_eq!(f.sizes(), &[2, 2, 2]); // #PYTHON list(f.shape)
 
         Ok(())
     }
