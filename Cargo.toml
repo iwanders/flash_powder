@@ -26,5 +26,5 @@ zerocopy = "0.8.48"
 tinyvec = "1.11.0"
 
 # Very broad version, such that the consumer can pick it if they want to.
-safetensors = "*"
-image = "*"
+safetensors = "0.8"
+image = {version="0.25" , default-features=false}

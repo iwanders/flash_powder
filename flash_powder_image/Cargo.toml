@@ -17,6 +17,9 @@ flash_powder  = {workspace=true, features=[ ]}
 torch_stable = {workspace=true, features=[ ]}
 
 
+[dev-dependencies]
+image = {workspace=true, features=["png"]}
+
 
 # We don't actually need these features.
 #[features]

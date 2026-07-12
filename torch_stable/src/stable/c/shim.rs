@@ -78,8 +78,6 @@ unsafe extern "C" {
     ) -> AOTITorchError;
 }
 
-// From https://github.com/pytorch/pytorch/pull/180135/
-#[cfg(feature = "v2_13")]
 unsafe extern "C" {
 
     pub unsafe fn torch_exception_get_what() -> *const c_char;
@@ -87,8 +85,6 @@ unsafe extern "C" {
 
 }
 
-// https://github.com/pytorch/pytorch/pull/179421
-#[cfg(feature = "v2_13")]
 unsafe extern "C" {
 
     pub unsafe fn torch_new_stable_ivalue(

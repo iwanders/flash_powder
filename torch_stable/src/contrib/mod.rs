@@ -282,20 +282,6 @@ mod test {
         println!("a.data_ref(): {:?}", a.data_ref()?);
         assert_eq!(a.data_ref()?, &[3, 0, 160, 64]);
 
-        #[cfg(not(feature = "v2_13"))]
-        {
-            let b = a.to(&ToOptions {
-                // device: Some(Device::from_str("cpu")?),
-                device: Some(Device::from_str("cuda:0")?),
-                copy: false,
-                ..Default::default()
-            })?;
-            println!("b.data_ptr: {:?}", b.data_ptr());
-            println!("b.const_data_ptr: {:?}", b.const_data_ptr());
-            println!("b.mutable_data_ptr: {:?}", b.mutable_data_ptr());
-            assert_eq!(b.data_mut().is_err(), true);
-        }
-
         assert_eq!(a.data_ref()?, a.t_ref::<u8>()?);
 
         Ok(())

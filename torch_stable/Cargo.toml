@@ -18,10 +18,7 @@ cc={workspace=true}
 
 [features]
 
-# Version that is being targetted.
-v2_13 = []
-
 # Whether to link against torch_cuda.
 cuda = []
 
-default=["v2_13"]
+default=[ ]

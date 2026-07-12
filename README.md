@@ -143,14 +143,22 @@ It also handles `[B, C, H, W`], which creates a row of images, and `[V, B, C, H,
 
 Run this to add the dependency to a cargo project in both `build-dependencies` and `dependencies`;
 ```
-cargo add --git https://github.com/iwanders/flash_powder.git flash_powder  -F v2_13,cuda
-cargo add --git https://github.com/iwanders/flash_powder.git flash_powder  -F v2_13,cuda --build
+cargo add --git https://github.com/iwanders/flash_powder.git flash_powder  -F cuda
+cargo add --git https://github.com/iwanders/flash_powder.git flash_powder  -F cuda --build
 ```
 
 Update with
 ```
 cargo update
 ```
+
+The minimum PyTorch/libTorch version is 2.13, which was the version under development when I reached out about this ffi
+use case with [this comment](https://github.com/pytorch/pytorch/issues/174507#issuecomment-4150977835), 
+a followup [issue](https://github.com/pytorch/pytorch/issues/179427) around lack of error retrieval functionality was created.
+The proposed changes were incorporated [in this PR](https://github.com/pytorch/pytorch/pull/180135), and improved in a [followup](https://github.com/pytorch/pytorch/pull/183823).
+The lack of allocator/deleter for `StableIValue` was addressed [in this PR](https://github.com/pytorch/pytorch/pull/179421).
+
+
 
 ## Testing
 

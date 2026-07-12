@@ -22,8 +22,5 @@ torch_stable = {workspace=true, features=[ ]}
 
 [features]
 
-# Version that is being targetted.
-v2_13 = ["torch_stable/v2_13"]
-
 # Whether to link against torch_cuda.
 cuda = ["torch_stable/cuda"]
