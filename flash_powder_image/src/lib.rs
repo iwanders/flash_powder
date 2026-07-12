@@ -421,11 +421,6 @@ impl<Buffer> FlatSamplesToTensor<Buffer> for image::flat::FlatSamples<Buffer> {
             let slice: &'a [T] = self.samples.as_ref();
             let byte_slice: &'a [u8] = zerocopy::IntoBytes::as_bytes(slice);
 
-            println!(
-                "Passing tensor blob options: {options:?} with byte slice length: {}",
-                byte_slice.len()
-            );
-
             let min_length = self
                 .layout
                 .min_length()
