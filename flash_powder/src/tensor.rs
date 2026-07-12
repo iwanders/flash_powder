@@ -127,7 +127,7 @@ impl<'a> Ten<'a> {
         */
         let data_ptr: *const u8 = data.as_ptr();
         let data_void: *mut std::ffi::c_void = unsafe { transmute(data_ptr) };
-        dbg!(data_ptr, data_void, data.len());
+
         if options.strides.len() != options.sizes.len() {
             anyhow::bail!("strides and sizes should be equal length");
         }
@@ -135,8 +135,6 @@ impl<'a> Ten<'a> {
         let element_size = unsafe {
             torch_stable::aoti_torch::aoti_torch_dtype_element_size(options_scalartype as _)
         };
-        dbg!(options.dtype);
-        dbg!(element_size);
         let last_position: usize = options
             .sizes
             .iter()
@@ -144,7 +142,7 @@ impl<'a> Ten<'a> {
             .map(|(size, stride)| (size - 1) * stride)
             .sum();
         let last_byte = (last_position * element_size) + element_size;
-        dbg!(last_byte);
+
         if data.len() < last_byte {
             anyhow::bail!(
                 "the provided data length is not sufficient to read the last element at {last_position} of {element_size} bytes"

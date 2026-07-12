@@ -417,7 +417,6 @@ impl<Buffer> FlatSamplesToTensor<Buffer> for image::flat::FlatSamples<Buffer> {
                 dtype,
             };
             let slice: &'a [T] = self.samples.as_ref();
-            // Example utilizing zerocopy to read bytes safely
             let byte_slice: &'a [u8] = zerocopy::IntoBytes::as_bytes(slice);
 
             println!(
@@ -428,8 +427,7 @@ impl<Buffer> FlatSamplesToTensor<Buffer> for image::flat::FlatSamples<Buffer> {
             let min_length = self
                 .layout
                 .min_length()
-                .ok_or(anyhow::format_err!("too big"))?;
-            dbg!(min_length);
+                .ok_or(anyhow::format_err!("min length could not be calculated"))?;
             if min_length > slice.len() {
                 bail!("layout can't fit in length")
             }
