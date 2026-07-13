@@ -156,6 +156,8 @@ pub trait DataRef: TensorAccess + TensorProperties {
     impl_slice_ref!(i32, i32s_ref);
     impl_slice_ref!(i64, i64s_ref);
 
+    impl_slice_ref!(bool, bools_ref);
+
     // Indexed
     impl_item_ref!(f32, f32_ref);
     impl_item_ref!(f64, f64_ref);
@@ -170,6 +172,8 @@ pub trait DataRef: TensorAccess + TensorProperties {
     impl_item_ref!(i32, i32_ref);
     impl_item_ref!(i64, i64_ref);
 
+    impl_slice_ref!(bool, bool_ref);
+
     // Scalar
     impl_as_ref!(f32, as_f32);
     impl_as_ref!(f64, as_f64);
@@ -183,6 +187,8 @@ pub trait DataRef: TensorAccess + TensorProperties {
     impl_as_ref!(i16, as_i16);
     impl_as_ref!(i32, as_i32);
     impl_as_ref!(i64, as_i64);
+
+    impl_slice_ref!(bool, as_bool);
 }
 
 impl DataRef for Tensor {}

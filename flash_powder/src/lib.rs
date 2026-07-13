@@ -36,6 +36,12 @@ Todo;
 Nice to have:
     - Printing with scientific mode / int mode, see comment in printing.rs
     - Summarized printing without copying the entire tensor to contiguous and cpu, only copy what is printed.
+    - Note on >= operator;
+        // This function has like 5 overloads, the most important are Scalar and Tensor, for now we require TensorAccess
+        // in the future, after Scalar is created, we can drop that req in Favour of a ScalarOrTensor trait, which would
+        // allow us to handle both with the same function, and also support casting native types to Scalar.
+        fn ge<T: TensorAccess + Into<StableIValue>>(&self, other: &T) -> StableTorchResult<Tensor> {
+
 
 Tricky:
     - Indexing with tensors with "index.Tensor" always returns a copy, but the current indexing system returns a view.

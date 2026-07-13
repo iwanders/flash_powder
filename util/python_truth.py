@@ -268,6 +268,9 @@ def format_payload_as_rust(payload, rust_type=None):
         if payload and isinstance(payload[0], float):
             if rust_type and rust_type not in RUST_FLOATS:
                 raise ValueError(f"Trying to convert {payload} to {rust_type}")
+        if payload and isinstance(payload[0], bool):
+            # late-stage fix for formatting.
+            payload = ["true" if p else "false" for p in payload]
         payload_str = [str(p) for p in payload]
 
         if payload_str:
