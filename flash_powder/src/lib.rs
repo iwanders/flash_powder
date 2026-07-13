@@ -32,9 +32,7 @@ Todo;
         - mean(tensor) https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L4041
         - and mean(&self, mean_options: &MeanOptions) are already ruined :(
         - Since overloads can always be added, we should probably always just use the full name with _ in between?
-
-    - That from_blob thing to be able to to zerocopy creation from safetensors.
-    - Addition for u8's... :'( let square_255 = Tensor::zeros(&[6, 6], &fp::DType::U8.into())?.add(&u8_255)?;
+    - Should we move functional into nn?
 Nice to have:
     - Printing with scientific mode / int mode, see comment in printing.rs
     - Summarized printing without copying the entire tensor to contiguous and cpu, only copy what is printed.
@@ -42,7 +40,7 @@ Nice to have:
 Tricky:
     - Indexing with tensors with "index.Tensor" always returns a copy, but the current indexing system returns a view.
       We can't reconcile this without an extra method, or indexing overload or something. For now we can use index_tensor,
-    - Currently reading a statedict doesn't clear optional tensors.
+    - Currently reading a statedict doesn't clear optional tensors, should it? what does the python side do?
 
  */
 
@@ -72,6 +70,7 @@ pub use torch_stable::stable::device::Device;
 
 pub use torch_stable;
 
+// Yes, this is private, it's only used for printing and not fully featured.
 mod f16;
 
 /// The prelude that contains all the necessary traits.

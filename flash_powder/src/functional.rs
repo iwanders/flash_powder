@@ -1,5 +1,5 @@
 //! This holds functions that pytorch puts into the functional module.
-use crate::properties::TensorProperties;
+use crate::{properties::TensorProperties, DType};
 use anyhow::bail;
 use torch_stable::{
     aoti_torch::StableIValue, stable::tensor::Tensor as StableTensor, unsafe_call_dispatch_bail,
@@ -235,7 +235,7 @@ pub fn interpolate<T: TensorAccess + TensorProperties>(
     options: &InterpolateOptions,
 ) -> StableTorchResult<Tensor> {
     let dim = input.dim() - 2; // Number of spatial dimensions.
-    // Validation in https://github.com/pytorch/pytorch/blob/v2.11.0/torch/nn/functional.py#L4715-L4761 :o
+                               // Validation in https://github.com/pytorch/pytorch/blob/v2.11.0/torch/nn/functional.py#L4715-L4761 :o
 
     let mut scale_factors: Option<&[f64]> = None;
     let mut output_size: Option<&[i64]> = None;
@@ -369,6 +369,25 @@ pub fn upsample<T: TensorAccess + TensorProperties>(
     };
 
     interpolate(input, &interpolate_options)
+}
+
+/// Softmax
+///
+/// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L13001-L13053)
+/// - [pytorch equivalent](https://docs.pytorch.org/docs/2.13/generated/torch.nn.functional.softmax.html)
+/// - [pytorch class](https://docs.pytorch.org/docs/2.13/generated/torch.nn.Softmax.html#torch.nn.Softmax)
+///
+/// softmax.int(Tensor self, int dim, ScalarType? dtype=None) -> Tensor
+pub fn softmax_int<T: TensorAccess + TensorProperties>(
+    input: &T,
+    dim: isize,
+    dtype: Option<DType>,
+) -> StableTorchResult<Tensor> {
+    let mut stack: [StableIValue; 3] = [input.get_tensor().into(), (dim).into(), (&dtype).into()];
+    unsafe_call_dispatch_bail!("aten::softmax", "int", stack.as_mut_slice());
+    let r: StableTensor = stack[0].try_into()?;
+
+    Ok(Tensor::new(r))
 }
 
 #[cfg(test)]
@@ -622,9 +641,7 @@ mod test {
         assert_eq!(m.sizes(), &[1, 1, 4, 4]); // #PYTHON list(m.shape)
         assert_eq!(
             m.f32s_ref()?,
-            &[
-                1.0f32, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 3.0, 3.0, 4.0, 4.0
-            ]
+            &[1.0f32, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 3.0, 3.0, 4.0, 4.0]
         ); // #PYTHON list(m.view(-1).tolist())
 
         // Bilinear 2
@@ -737,6 +754,44 @@ mod test {
         assert_eq!(w.sizes(), &[1, 64, 8, 9]); // #PYTHON list(w.shape)
         let output = adaptive_avg_pool2d(&w, (5, 7))?;
         assert_eq!(output.sizes(), &[1, 64, 5, 7]); // #PYTHON list(output.shape)
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_softmax_int() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            d = torch.tensor(list(range(1,10)), dtype=torch.float).reshape([1,3,3])
+            s0 = torch.nn.functional.softmax(d, 0)
+            s1 = torch.nn.functional.softmax(d, 1)
+        */
+
+        let d = Tensor::from(&[[[1.0f32, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]])?;
+        assert_eq!(d.sizes(), &[1, 3, 3]); // #PYTHON list(d.shape)
+
+        let s0 = softmax_int(&d, 0, None)?;
+        assert_eq!(s0.sizes(), &[1, 3, 3]); // #PYTHON list(s0.shape)
+        assert_eq!(
+            s0.f32s_ref()?,
+            &[1.0f32, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        ); // #PYTHON list(s0.view(-1).tolist())
+        let s1 = softmax_int(&d, 1, None)?;
+        assert_eq!(s1.sizes(), &[1, 3, 3]); // #PYTHON list(s1.shape)
+        assert_eq!(
+            s1.f32s_ref()?,
+            &[
+                0.0023556333035230637f32,
+                0.0023556333035230637,
+                0.0023556333035230637,
+                0.04731415584683418,
+                0.04731415584683418,
+                0.04731415584683418,
+                0.9503302574157715,
+                0.9503302574157715,
+                0.9503302574157715
+            ]
+        ); // #PYTHON list(s1.view(-1).tolist())
+
         Ok(())
     }
 }
