@@ -434,8 +434,21 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     /// - [tensor method](https://docs.pytorch.org/docs/2.13/generated/torch.Tensor.flip.html)
     /// - [pytorch method](https://docs.pytorch.org/docs/2.13/generated/torch.flip.html)
     fn flip(&self, dims: &[usize]) -> StableTorchResult<Tensor> {
-        let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), (dims).into()];
+        let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), dims.into()];
         unsafe_call_dispatch_bail!("aten::flip", "", stack.as_mut_slice());
+        let r: StableTensor = stack[0].try_into()?;
+        Ok(Tensor::new(r))
+    }
+
+    /// Greater or Equal then
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L8905)
+    // This function has like 5 overloads, the most important are Scalar and Tensor, for now we require TensorAccess
+    // in the future, after Scalar is created, we can drop that req in Favour of a ScalarOrTensor trait, which would
+    // allow us to handle both with the same function, and also support casting native types to Scalar.
+    fn ge<T: TensorAccess>(&self, other: &T) -> StableTorchResult<Tensor> {
+        let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), other.get_tensor().into()];
+        unsafe_call_dispatch_bail!("aten::greater_equal", "Tensor", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         Ok(Tensor::new(r))
     }
@@ -1330,6 +1343,30 @@ mod test {
         let f = x.flip(&[0, 1])?;
         assert_eq!(f.i64s_ref()?, &[7, 8, 5, 6, 3, 4, 1, 2]); // #PYTHON f.ravel().tolist()
         assert_eq!(f.sizes(), &[2, 2, 2]); // #PYTHON list(f.shape)
+
+        Ok(())
+    }
+    #[test]
+    fn test_flash_powder_ge_tensor() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            x = torch.tensor(list(range(1,10)), dtype=torch.int64).reshape([3,3])
+            v = torch.tensor(4)
+            c = x >= v
+        */
+        let d = Tensor::from(&[1i64, 2, 3, 4, 5, 6, 7, 8, 9])?;
+        let x = d.view(&[3, 3])?;
+        assert_eq!(x.i64s_ref()?, &[1, 2, 3, 4, 5, 6, 7, 8, 9]); // #PYTHON x.ravel().tolist()
+        assert_eq!(x.sizes(), &[3, 3]); // #PYTHON list(x.shape)
+
+        let f: Tensor = 4i64.try_into()?;
+        let c = x.ge(&f)?;
+
+        assert_eq!(
+            c.bools_ref()?,
+            &[false, false, false, true, true, true, true, true, true]
+        ); // #PYTHON c.ravel().tolist()
+        assert_eq!(c.sizes(), &[3, 3]); // #PYTHON list(c.shape)
 
         Ok(())
     }
