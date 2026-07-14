@@ -269,7 +269,6 @@ mod test {
         Ok(())
     }
 
-    #[cfg(feature = "cuda")]
     #[test]
     fn test_tensor_contrib_data() -> StableTorchResult<()> {
         let mut a = Tensor::from_f32(5.0)?.unsqueeze(0)?;
@@ -342,6 +341,65 @@ mod test {
         assert_eq!(t.dim(), 1); // torch.arange(0, 24).dim()
         assert_eq!(t.sizes(), &[24]); // torch.arange(0, 24).shape
         assert!(t.t_ref::<u64>()?.iter().zip(0..24u64).all(|(a, b)| *a == b));
+
+        Ok(())
+    }
+
+    #[cfg(feature = "cuda")]
+    // #[test]
+    #[allow(dead_code)]
+    fn test_tensor_contrib_cuda_stream_tests() -> StableTorchResult<()> {
+        use crate::aoti_torch::*;
+        use crate::stable::c::*;
+        let a = Tensor::zeros(
+            &[20000, 20000],
+            &EmtpyOptions {
+                device: Some(Device::CUDA),
+                ..Default::default()
+            },
+        )?;
+        let b = a.matmul(&a)?;
+
+        let mut ret_device_index: i32 = 0;
+
+        unsafe_call_bail!(aoti_torch_get_current_device_index(&mut ret_device_index,));
+        println!("ret_device_index: {ret_device_index:?}");
+
+        let device_index = 0;
+
+        let mut handle_stream: StreamHandle = std::ptr::null_mut();
+
+        unsafe_call_bail!(aoti_torch_get_current_stream(
+            device_index,
+            &mut handle_stream
+        ));
+        assert!(!handle_stream.is_null());
+        println!("handle_stream: {handle_stream:?}");
+
+        // get a native handle;
+
+        let mut ret_stream: *mut std::ffi::c_void = std::ptr::null_mut();
+        unsafe_call_bail!(aoti_torch_get_current_cuda_stream(
+            device_index,
+            &mut ret_stream
+        ));
+        assert!(!ret_stream.is_null());
+        println!("ret_stream: {ret_stream:?}");
+
+        let mut native_stream: *mut std::ffi::c_void = std::ptr::null_mut();
+
+        unsafe_call_bail!(torch_stream_native_handle(
+            handle_stream,
+            &mut native_stream
+        ));
+        assert!(!native_stream.is_null());
+        println!("native_stream: {native_stream:?}");
+
+        // unsafe_call_bail!(torch_cuda_stream_synchronize(
+        //     handle_stream.cast(),
+        //     device_index
+        // ));
+        println!("b: {:?}", b.sizes());
 
         Ok(())
     }

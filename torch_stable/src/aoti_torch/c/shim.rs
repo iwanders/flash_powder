@@ -2,6 +2,12 @@
 use super::macros::*;
 use libc::c_void;
 
+#[repr(C)]
+pub struct StreamOpaque {
+    _private: [u8; 0],
+}
+pub type StreamHandle = *mut StreamOpaque;
+
 // Keep the order the same as the original file.
 unsafe extern "C" {
 
@@ -219,6 +225,31 @@ unsafe extern "C" {
 
     // https://github.com/pytorch/pytorch/blob/v2.11.0/torch/csrc/inductor/aoti_torch/c/shim.h#L422C1-L423C74
     pub unsafe fn aoti_torch_zero_(_self: AtenTensorHandle) -> AOTITorchError;
+
+    // https://github.com/pytorch/pytorch/blob/3a6383d72a4fdfeaa0eb7740c6b651ca4fb2349b/torch/csrc/inductor/aoti_torch/c/shim.h#L566
+    /// UNTESTED
+    pub unsafe fn aoti_torch_get_current_stream(
+        device_index: i32,
+        ret_stream: &mut StreamHandle,
+    ) -> AOTITorchError;
+
+    /// UNTESTED
+    pub unsafe fn aoti_torch_delete_stream(stream: StreamHandle) -> AOTITorchError;
+
+    // https://github.com/pytorch/pytorch/blob/3a6383d72a4fdfeaa0eb7740c6b651ca4fb2349b/torch/csrc/inductor/aoti_torch/c/shim.h#L580-L581
+    /// UNTESTED
+    pub unsafe fn aoti_torch_get_current_device_index(ret_device_index: *mut i32)
+    -> AOTITorchError;
+}
+
+#[cfg(feature = "cuda")]
+unsafe extern "C" {
+    /// UNTESTED
+    pub unsafe fn aoti_torch_get_current_cuda_stream(
+        device_index: i32,
+        ret_stream: &mut *mut c_void,
+    ) -> AOTITorchError;
+
 }
 
 // https://github.com/pytorch/pytorch/blob/3848e11d554a7f49925b593c40b8be0b86ac6b3f/docs/source/notes/libtorch_stable_abi.md#stableivalue-conversions

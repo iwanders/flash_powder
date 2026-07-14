@@ -116,3 +116,24 @@ unsafe extern "C" {
     ) -> AOTITorchError;
 
 }
+
+// https://github.com/pytorch/pytorch/blob/3a6383d72a4fdfeaa0eb7740c6b651ca4fb2349b/torch/csrc/stable/accelerator.h#L78-L131
+
+unsafe extern "C" {
+    /// UNTESTED
+    pub unsafe fn torch_stream_native_handle(
+        stream: StreamHandle,
+        ret_native_handle: *mut *mut c_void,
+    ) -> AOTITorchError;
+
+}
+
+#[cfg(feature = "cuda")]
+unsafe extern "C" {
+    /// UNTESTED
+    pub unsafe fn torch_cuda_stream_synchronize(
+        stream: *mut c_void,
+        device_index: i32,
+    ) -> AOTITorchError;
+
+}
