@@ -175,6 +175,9 @@ where
             bail!("unsupported dtype: {:?}", v.dtype())
         }
 
+        // Now that we're done doing all this work, we can transfer the tensor the CPU for copying the data.
+        let v = v.to(&fp::Device::CPU.into())?;
+
         // Next, we can make the dynamic image.
         let width = (image_per_row * image_width) as u32;
         let height = (image_rows * image_height) as u32;
