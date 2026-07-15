@@ -61,7 +61,7 @@ impl Sequential {
     }
     pub fn get_mut_as<T: Sized + 'static>(&mut self, index: usize) -> Option<&mut T> {
         if let Some(v) = self.get_mut(index) {
-            v.as_any_mut().downcast_mut()
+            (v as &mut dyn std::any::Any).downcast_mut()
         } else {
             None
         }
@@ -71,7 +71,7 @@ impl Sequential {
     }
     pub fn get_as<T: Sized + 'static>(&self, index: usize) -> Option<&T> {
         if let Some(v) = self.get(index) {
-            v.as_any_ref().downcast_ref()
+            (v as &dyn std::any::Any).downcast_ref()
         } else {
             None
         }
@@ -289,5 +289,20 @@ pub struct Identity;
 impl Module for Identity {
     fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
         input.to_owned()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_layer_sequential_cast() {
+        let mut v = Sequential::new();
+        v.push(Identity);
+        let r = v.get_as::<Identity>(0);
+        assert!(r.is_some());
+        let r = v.get_mut_as::<Identity>(0);
+        assert!(r.is_some());
     }
 }

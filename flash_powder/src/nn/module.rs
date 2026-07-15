@@ -4,34 +4,31 @@ use torch_stable::StableTorchResult;
 
 use crate::{Ten, Tensor, core_methods::CoreMethods as _};
 
-// from https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=f0cee315491dc3c3b6b3f467d6a3b072
-// Provide a custom trait so that we can write a blanket implementation.
-pub trait AsAny {
-    fn as_any_ref(&self) -> &dyn std::any::Any;
+/*
+ Notes from the python side:
+    Loading a state dict raises if the tensor sizes don't match exactly.
+    Loading a state dict raises if any tensor is present that was not expected.
+    Loading a state dict raises for any tensor that is expected but missing.
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+    In short, it is super strict.
 
-    fn as_any_box(self: Box<Self>) -> Box<dyn std::any::Any>;
-}
+    That's less than ideal, because tensor size having to match is more annoying than just having to match the topology
+    with the python side.
 
-impl<T> AsAny for T
-where
-    T: std::any::Any,
-{
-    // This cast cannot be written in a default implementation so cannot be
-    // moved to the original trait without implementing it for every type.
-    fn as_any_ref(&self) -> &dyn std::any::Any {
-        self
+    Maybe:
+    struct LoadOptions{
+        pub check_tensor_size: bool,
+        pub allow_unused_tensors: bool,
     }
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
+    That allows enforcing the tensor size.
+    And allow_unused_tensors = false captures situations where the rust side has Option<Tensor>'s with None, that are in the dict?
+    It doesn't allow clearing Options though.... maybe clear_optional: bool
 
-    fn as_any_box(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-}
+    but that doesn't handle the current signatures...
+
+    Do we also want to be able to inject metadata? It can be convenient if the model topology can be in the safetensors metadata.
+*/
 
 /// Value enum for [`StateDict`].
 #[derive(Debug, Clone)]
@@ -359,7 +356,7 @@ impl<'a> ModuleTensorsMut<'a> {
 ///
 /// </div>
 ///
-pub trait Module: std::fmt::Debug + AsAny {
+pub trait Module: std::fmt::Debug + std::any::Any {
     /// Define the computation performed at every call.
     fn forward(&self, input: &Ten<'_>) -> StableTorchResult<Tensor>;
     // These look relevant;

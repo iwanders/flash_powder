@@ -46,7 +46,6 @@ Nice to have:
 Tricky:
     - Indexing with tensors with "index.Tensor" always returns a copy, but the current indexing system returns a view.
       We can't reconcile this without an extra method, or indexing overload or something. For now we can use index_tensor,
-    - Currently reading a statedict doesn't clear optional tensors, should it? what does the python side do?
 
  */
 
