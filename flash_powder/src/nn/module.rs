@@ -205,9 +205,7 @@ impl<'a> ModuleTensors<'a> {
     }
 
     pub fn insert_optional<T: Into<String>>(&mut self, k: T, tensor: &'a Option<Tensor>) {
-        if let Some(tensor) = tensor {
-            let _ = self.map.insert(k.into(), tensor.into());
-        }
+        let _ = self.map.insert(k.into(), tensor.into());
     }
     pub fn insert_namespaced(&mut self, k: &str, tensors: ModuleTensors<'a>) {
         self.extend(&mut tensors.into_namespaced(k).drain())
@@ -293,9 +291,7 @@ impl<'a> ModuleTensorsMut<'a> {
     }
 
     pub fn insert_optional<T: Into<String>>(&mut self, k: T, tensor: &'a mut Option<Tensor>) {
-        if let Some(tensor) = tensor {
-            let _ = self.map.insert(k.into(), tensor.into());
-        }
+        let _ = self.map.insert(k.into(), tensor.into());
     }
     pub fn insert_namespaced(&mut self, k: &str, tensors: ModuleTensorsMut<'a>) {
         self.extend(&mut tensors.into_namespaced(k).drain())
@@ -342,7 +338,7 @@ impl<'a> ModuleTensorsMut<'a> {
     /// Retrieve the optional into which the tensor by name may be stored.
     ///
     /// This allows clearing the tensor.
-    pub fn get_optional(&'a mut self, name: &str) -> Option<&'a mut Option<Tensor>> {
+    pub fn get_optional<'b>(&'b mut self, name: &str) -> Option<&'b mut Option<Tensor>> {
         if let Some(value) = self.map.get_mut(name) {
             match value {
                 ModuleTensorMut::Always(_) => None,
@@ -375,10 +371,15 @@ pub struct StateDictLoadOptions {
     ///
     /// Identical to the python functionality.
     pub assign: bool,
-    // /// Clear optional tensors that are not present in the state dictionary.
-    // ///
-    // /// This has no equivalent on the python side.
-    // pub clear_optional: bool,
+
+    /// Match optional tensors to the state dictionary.
+    ///
+    /// If assign is false, this will clear optionals populated in the destination that aren't in the state dict.
+    /// If assign is true, this can change an optional tensor slot to a populated one if the tensor is present in the
+    /// state dictionary.
+    ///
+    /// This has no equivalent on the python side.
+    pub match_optional: bool,
 }
 
 impl Default for StateDictLoadOptions {
@@ -386,7 +387,7 @@ impl Default for StateDictLoadOptions {
         Self {
             strict: true,
             assign: false,
-            //   clear_optional: false,
+            match_optional: false,
         }
     }
 }
@@ -525,8 +526,31 @@ pub trait Module: std::fmt::Debug + std::any::Any {
             }
         }
 
+        if options.match_optional {
+            let keys: Vec<String> = self.tensors_mut().keys().cloned().collect();
+            // Retrieve the optional keys, check if it exists, if not clear them, then fall through to the assign.
+            let mut tensors_mut = self.tensors_mut();
+            for k in keys {
+                if let Some(optional_tensor) = tensors_mut.get_optional(&k) {
+                    // See if this exists in the dict.
+                    if let Some(ten_in_dict) = dict.ten(&k) {
+                        // It is not present in the destination, but assign is true, so we can populate the optional.
+                        if options.assign {
+                            *optional_tensor = Some(ten_in_dict.to_owned()?);
+                        }
+                    } else {
+                        // Optional tensor is not present in the dictionary, so we clear it.
+                        *optional_tensor = None
+                    }
+                } else {
+                    // Tensor is not actually optional, it is always required.
+                }
+            }
+        }
+
         for (k, v) in self.tensors_mut().drain() {
             if options.assign {
+                // Assign the tensor directly, overwriting properties.
                 *v = dict.ten_required(&k)?.to_owned()?;
             } else {
                 // Copy from the tensor, keeping its properties.
@@ -723,7 +747,7 @@ mod test {
             let options = StateDictLoadOptions {
                 strict: true,
                 assign: false,
-                clear_optional: false,
+                match_optional: false,
             };
             let r = linear2.load_state_dict(&l1_dict, &options);
             assert!(r.is_err());
@@ -749,7 +773,7 @@ mod test {
             let options = StateDictLoadOptions {
                 strict: true,
                 assign: false,
-                clear_optional: false,
+                match_optional: false,
             };
             let r = linear2.load_state_dict(&l1_dict, &options);
             assert!(r.is_err());
@@ -776,7 +800,7 @@ mod test {
             let options = StateDictLoadOptions {
                 strict: false,
                 assign: false,
-                clear_optional: false,
+                match_optional: false,
             };
             linear2.load_state_dict(&l1_dict, &options)?;
             assert_eq!(linear2.weight.dtype(), DType::F32);
@@ -798,15 +822,15 @@ mod test {
             let options = StateDictLoadOptions {
                 strict: false,
                 assign: true,
-                clear_optional: false,
+                match_optional: false,
             };
             linear2.load_state_dict(&l1_dict, &options)?;
             assert_eq!(linear2.weight.dtype(), DType::F64);
         }
 
-        if false {
+        if true {
             // Finally, check if we can clear optionals if they're not present.
-            let linear1 = Linear {
+            let mut linear1 = Linear {
                 weight: f64_one.clone(),
                 bias: None,
             };
@@ -816,14 +840,27 @@ mod test {
                 weight: f32_2.clone(),
                 bias: Some(f64_one.clone()),
             };
+            let l2_dict = linear2.state_dict()?;
             let options = StateDictLoadOptions {
                 strict: false,
                 assign: false,
-                clear_optional: true,
+                match_optional: true,
             };
+            // This situation clears the optioanl.
             linear2.load_state_dict(&l1_dict, &options)?;
             assert!(linear2.bias.is_none());
-            todo!();
+
+            // With the config from above, assign is false, so we can't assign into a None.
+            linear1.load_state_dict(&l2_dict, &options)?;
+            assert!(linear1.bias.is_none());
+
+            let options = StateDictLoadOptions {
+                strict: false,
+                assign: true,
+                match_optional: true,
+            };
+            linear1.load_state_dict(&l2_dict, &options)?;
+            assert!(linear1.bias.is_some());
         }
         Ok(())
     }
