@@ -372,14 +372,17 @@ pub struct StateDictLoadOptions {
     /// Identical to the python functionality.
     pub assign: bool,
 
-    /// Match optional tensors to the state dictionary.
-    ///
-    /// If assign is false, this will clear optionals populated in the destination that aren't in the state dict.
-    /// If assign is true, this can change an optional tensor slot to a populated one if the tensor is present in the
-    /// state dictionary.
+    /// Clear optional tensors if present in the destination but not in the state dictionary.
     ///
     /// This has no equivalent on the python side.
-    pub match_optional: bool,
+    pub clear_optional: bool,
+
+    /// Populate optional tensors if not yet populated in the destination and present in the state dictionary.
+    ///
+    /// This always assigns, regardless of the [`assign`] field.
+    ///
+    /// This has no equivalent on the python side.
+    pub populate_optional: bool,
 }
 
 impl Default for StateDictLoadOptions {
@@ -387,7 +390,8 @@ impl Default for StateDictLoadOptions {
         Self {
             strict: true,
             assign: false,
-            match_optional: false,
+            clear_optional: false,
+            populate_optional: false,
         }
     }
 }
@@ -526,24 +530,27 @@ pub trait Module: std::fmt::Debug + std::any::Any {
             }
         }
 
-        if options.match_optional {
+        if options.clear_optional || options.populate_optional {
             let keys: Vec<String> = self.tensors_mut().keys().cloned().collect();
             // Retrieve the optional keys, check if it exists, if not clear them, then fall through to the assign.
             let mut tensors_mut = self.tensors_mut();
             for k in keys {
+                // Only operate on tensors marked optional.
                 if let Some(optional_tensor) = tensors_mut.get_optional(&k) {
                     // See if this exists in the dict.
                     if let Some(ten_in_dict) = dict.ten(&k) {
                         // It is not present in the destination, but assign is true, so we can populate the optional.
-                        if options.assign {
+                        if optional_tensor.is_none() && options.populate_optional {
+                            // This may lead to an extra assignment in the assignment for loop below.
                             *optional_tensor = Some(ten_in_dict.to_owned()?);
                         }
                     } else {
-                        // Optional tensor is not present in the dictionary, so we clear it.
-                        *optional_tensor = None
+                        // Tensor not present in the state dictionary
+                        if options.clear_optional {
+                            // Optional tensor is not present in the dictionary, so we clear it.
+                            *optional_tensor = None
+                        }
                     }
-                } else {
-                    // Tensor is not actually optional, it is always required.
                 }
             }
         }
@@ -747,7 +754,8 @@ mod test {
             let options = StateDictLoadOptions {
                 strict: true,
                 assign: false,
-                match_optional: false,
+                clear_optional: false,
+                populate_optional: false,
             };
             let r = linear2.load_state_dict(&l1_dict, &options);
             assert!(r.is_err());
@@ -773,7 +781,8 @@ mod test {
             let options = StateDictLoadOptions {
                 strict: true,
                 assign: false,
-                match_optional: false,
+                clear_optional: false,
+                populate_optional: false,
             };
             let r = linear2.load_state_dict(&l1_dict, &options);
             assert!(r.is_err());
@@ -800,7 +809,8 @@ mod test {
             let options = StateDictLoadOptions {
                 strict: false,
                 assign: false,
-                match_optional: false,
+                clear_optional: false,
+                populate_optional: false,
             };
             linear2.load_state_dict(&l1_dict, &options)?;
             assert_eq!(linear2.weight.dtype(), DType::F32);
@@ -822,7 +832,8 @@ mod test {
             let options = StateDictLoadOptions {
                 strict: false,
                 assign: true,
-                match_optional: false,
+                clear_optional: false,
+                populate_optional: false,
             };
             linear2.load_state_dict(&l1_dict, &options)?;
             assert_eq!(linear2.weight.dtype(), DType::F64);
@@ -844,20 +855,23 @@ mod test {
             let options = StateDictLoadOptions {
                 strict: false,
                 assign: false,
-                match_optional: true,
+                clear_optional: true,
+                populate_optional: false,
             };
             // This situation clears the optioanl.
             linear2.load_state_dict(&l1_dict, &options)?;
             assert!(linear2.bias.is_none());
 
-            // With the config from above, assign is false, so we can't assign into a None.
+            // With the config from above, populate_optional is false, so we can't assign into a None.
             linear1.load_state_dict(&l2_dict, &options)?;
             assert!(linear1.bias.is_none());
 
+            // If we change that to populating optionals, it should assign;
             let options = StateDictLoadOptions {
                 strict: false,
                 assign: true,
-                match_optional: true,
+                clear_optional: false,
+                populate_optional: true,
             };
             linear1.load_state_dict(&l2_dict, &options)?;
             assert!(linear1.bias.is_some());
