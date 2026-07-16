@@ -166,7 +166,7 @@ pub fn main() -> Result<(), anyhow::Error> {
     // Instantiate vgg network and load its weights.
     let features = make_layers(CFG_A)?;
     let mut vgg = VGG::new(features)?;
-    vgg.load_state_dict(&reader)?;
+    vgg.load_state_dict(&reader, &Default::default())?;
 
     // Move to cuda if available.
     let use_cuda = fp::torch::cuda::is_available();

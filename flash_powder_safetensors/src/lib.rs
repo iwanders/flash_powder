@@ -24,7 +24,8 @@
 //!     // Create the destination nn::Module object.
 //!     let mut new_linear = fp::nn::Linear::new_without_bias(1, 1)?;
 //!     // Read into its tensors.
-//!     new_linear.load_state_dict(&reader)?;
+//!     let options = fp::nn::StateDictLoadOptions::default();
+//!     new_linear.load_state_dict(&reader, &options)?;
 //!     assert!(new_linear.weight.is_equal(&fp::Tensor::from(&[3.3])?)?);
 //!
 //!#    Ok(())
@@ -171,6 +172,10 @@ impl<'a, 'd> nn::StateDictAdaptor for SafetensorReader<'a, 'd> {
     fn ten(&self, name: &str) -> Option<Ten<'a>> {
         safetensor_to_ten(self.st, name).ok()
     }
+
+    fn keys(&self) -> std::collections::HashSet<String> {
+        self.st.names().iter().map(|v| (*v).to_owned()).collect()
+    }
 }
 impl<'a, 'd> nn::StateDictReader for SafetensorReader<'a, 'd> {
     fn inner(&self) -> &dyn nn::StateDictAdaptor {
@@ -216,8 +221,12 @@ mod test {
     use nn::Module;
     #[test]
     fn test_roundtrip() -> Result<(), anyhow::Error> {
-        let weight = fp::Tensor::randn(&[5, 5], &Default::default())?;
-        let bias = fp::Tensor::randn(&[5, 5], &Default::default())?;
+        let conv_for_dimensions = fp::nn::Conv2d::new(1, 1, (5, 5), Default::default())?;
+        let weight = fp::Tensor::randn(&conv_for_dimensions.weight.shape(), &Default::default())?;
+        let bias = fp::Tensor::randn(
+            &conv_for_dimensions.bias.as_ref().unwrap().shape(),
+            &Default::default(),
+        )?;
         let conv = fp::nn::Conv2d {
             weight,
             bias: Some(bias),
@@ -229,7 +238,7 @@ mod test {
         let safetensor_bytes = safetensors::tensor::serialize(
             adapted
                 .iter()
-                .map(|(k, v)| (k, SafetensorView::new(*v).unwrap())),
+                .map(|(k, v)| (k, SafetensorView::new(v).unwrap())),
             None,
         )?;
         assert!(!safetensor_bytes.is_empty());
@@ -238,8 +247,9 @@ mod test {
         let tensors = safetensors::SafeTensors::deserialize(&safetensor_bytes)?;
         let reader = SafetensorReader::from_safetensors(&tensors);
 
-        let mut new_conv = fp::nn::Conv2d::new(3, 3, (3, 3), Default::default())?;
-        new_conv.load_state_dict(&reader)?;
+        let mut new_conv = fp::nn::Conv2d::new(1, 1, (5, 5), Default::default())?;
+        let options = fp::nn::StateDictLoadOptions::default();
+        new_conv.load_state_dict(&reader, &options)?;
         assert!(conv.weight.is_equal(&new_conv.weight)?);
         assert!(
             conv.bias
@@ -253,7 +263,7 @@ mod test {
     #[test]
     fn test_minimal() -> Result<(), anyhow::Error> {
         // We create some dummy safetensor data here:
-        let weight = fp::Tensor::from(&[3.3])?;
+        let weight = fp::Tensor::from(&[[3.3f32]])?;
         let content = vec![("weight", SafetensorView::new(&weight).unwrap())];
         let safetensor_bytes = safetensors::tensor::serialize(content, None)?;
 
@@ -264,8 +274,13 @@ mod test {
         // Create the destination nn::Module object.
         let mut new_linear = fp::nn::Linear::new_without_bias(1, 1)?;
         // Read into its tensors.
-        new_linear.load_state_dict(&reader)?;
-        assert!(new_linear.weight.is_equal(&fp::Tensor::from(&[3.3])?)?);
+        let options = fp::nn::StateDictLoadOptions::default();
+        new_linear.load_state_dict(&reader, &options)?;
+        assert!(
+            new_linear
+                .weight
+                .is_equal(&fp::Tensor::from(&[[3.3f32]])?)?
+        );
 
         Ok(())
     }

@@ -2,33 +2,12 @@
 use anyhow;
 use torch_stable::StableTorchResult;
 
-use crate::{Ten, Tensor, core_methods::CoreMethods as _};
+use crate::{
+    Ten, Tensor,
+    core_methods::{CoreMethods as _, CoreMethodsMut},
+};
 
-/*
- Notes from the python side:
-    Loading a state dict raises if the tensor sizes don't match exactly.
-    Loading a state dict raises if any tensor is present that was not expected.
-    Loading a state dict raises for any tensor that is expected but missing.
-
-    In short, it is super strict.
-
-    That's less than ideal, because tensor size having to match is more annoying than just having to match the topology
-    with the python side.
-
-    Maybe:
-    struct LoadOptions{
-        pub check_tensor_size: bool,
-        pub allow_unused_tensors: bool,
-    }
-
-    That allows enforcing the tensor size.
-    And allow_unused_tensors = false captures situations where the rust side has Option<Tensor>'s with None, that are in the dict?
-    It doesn't allow clearing Options though.... maybe clear_optional: bool
-
-    but that doesn't handle the current signatures...
-
-    Do we also want to be able to inject metadata? It can be convenient if the model topology can be in the safetensors metadata.
-*/
+pub use std::collections::HashSet;
 
 /// Value enum for [`StateDict`].
 #[derive(Debug, Clone)]
@@ -114,29 +93,15 @@ impl StateDict {
 }
 
 pub trait StateDictAdaptor {
-    // fn tensor(&self, name: &str) -> Option<Tensor>;
     fn ten<'d>(&'d self, name: &str) -> Option<Ten<'d>>;
-    // fn tensor_required(&self, name: &str) -> StableTorchResult<Tensor> {
-    //     self.tensor(name)
-    //         .ok_or(anyhow::format_err!("missing required tensor '{name}'"))
-    // }
     fn ten_required<'d>(&'d self, name: &str) -> StableTorchResult<Ten<'d>> {
         self.ten(name)
             .ok_or(anyhow::format_err!("missing required tensor '{name}'"))
     }
+    fn keys(&self) -> HashSet<String>;
 }
 
 impl StateDictAdaptor for StateDict {
-    // fn tensor(&self, name: &str) -> Option<Tensor> {
-    //     if let Some(record) = self.map.get(name) {
-    //         match record {
-    //             Data::Parameter(tensor) => Some(tensor.clone()),
-    //             Data::Buffer(tensor) => Some(tensor.clone()),
-    //         }
-    //     } else {
-    //         None
-    //     }
-    // }
     fn ten<'d>(&'d self, name: &str) -> Option<Ten<'d>> {
         if let Some(record) = self.map.get(name) {
             match record {
@@ -146,6 +111,9 @@ impl StateDictAdaptor for StateDict {
         } else {
             None
         }
+    }
+    fn keys(&self) -> HashSet<String> {
+        self.map.keys().map(|a| a.to_owned()).collect()
     }
 }
 impl StateDictReader for StateDict {
@@ -190,27 +158,55 @@ impl<'a> StateDictAdaptor for NamespacedStateDictAdaptor<'a> {
         self.inner().ten(&m)
     }
 
-    // fn tensor(&self, name: &str) -> Option<Tensor> {
-    //     let m = self.namespace.join(".") + "." + name;
-    //     self.inner().tensor(&m)
-    // }
+    fn keys(&self) -> HashSet<String> {
+        let prefix = self.namespace.join(".") + ".";
+        let prefix = &prefix;
+        self.inner()
+            .keys()
+            .iter()
+            .filter_map(|a| {
+                if a.starts_with(prefix) {
+                    Some(a.replace(prefix, ""))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+}
+
+// Private type to encapsulate tensors present in the module.
+#[derive(Debug)]
+enum ModuleTensor<'a> {
+    Always(&'a Tensor),
+    Optional(&'a Option<Tensor>),
+}
+impl<'a> From<&'a Tensor> for ModuleTensor<'a> {
+    fn from(value: &'a Tensor) -> Self {
+        ModuleTensor::Always(value)
+    }
+}
+impl<'a> From<&'a Option<Tensor>> for ModuleTensor<'a> {
+    fn from(value: &'a Option<Tensor>) -> Self {
+        ModuleTensor::Optional(value)
+    }
 }
 
 #[derive(Debug, Default)]
 pub struct ModuleTensors<'a> {
-    map: std::collections::HashMap<String, &'a Tensor>,
+    map: std::collections::HashMap<String, ModuleTensor<'a>>,
 }
 impl<'a> ModuleTensors<'a> {
     pub fn new() -> Self {
         Default::default()
     }
     pub fn insert<T: Into<String>>(&mut self, k: T, tensor: &'a Tensor) {
-        let _ = self.map.insert(k.into(), tensor);
+        let _ = self.map.insert(k.into(), tensor.into());
     }
 
     pub fn insert_optional<T: Into<String>>(&mut self, k: T, tensor: &'a Option<Tensor>) {
         if let Some(tensor) = tensor {
-            let _ = self.map.insert(k.into(), tensor);
+            let _ = self.map.insert(k.into(), tensor.into());
         }
     }
     pub fn insert_namespaced(&mut self, k: &str, tensors: ModuleTensors<'a>) {
@@ -240,33 +236,65 @@ impl<'a> ModuleTensors<'a> {
         }
     }
     pub fn drain(&mut self) -> impl Iterator<Item = (String, &'a Tensor)> {
-        self.map.drain()
+        self.map.drain().filter_map(|(k, v)| match v {
+            ModuleTensor::Always(tensor) => Some((k, tensor)),
+            ModuleTensor::Optional(optional_tensor) => optional_tensor.as_ref().map(|a| (k, a)),
+        })
     }
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &&'a Tensor)> {
-        self.map.iter()
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &'a Tensor)> {
+        self.map.iter().filter_map(|(k, v)| match v {
+            ModuleTensor::Always(tensor) => Some((k, *tensor)),
+            ModuleTensor::Optional(optional_tensor) => optional_tensor.as_ref().map(|a| (k, a)),
+        })
     }
 
     pub fn extend<T: Iterator<Item = (String, &'a Tensor)>>(&mut self, t: T) {
-        self.map.extend(t)
+        self.map.extend(t.map(|(k, v)| (k, v.into())))
+    }
+}
+
+// Private type to encapsulate tensors present in the module.
+#[derive(Debug)]
+enum ModuleTensorMut<'a> {
+    Always(&'a mut Tensor),
+    Optional(&'a mut Option<Tensor>),
+}
+impl<'a> From<&'a mut Tensor> for ModuleTensorMut<'a> {
+    fn from(value: &'a mut Tensor) -> Self {
+        ModuleTensorMut::Always(value)
+    }
+}
+impl<'a> From<&'a mut Option<Tensor>> for ModuleTensorMut<'a> {
+    fn from(value: &'a mut Option<Tensor>) -> Self {
+        ModuleTensorMut::Optional(value)
+    }
+}
+impl<'a> ModuleTensorMut<'a> {
+    fn as_option(&'a mut self) -> Option<&'a mut Tensor> {
+        match self {
+            ModuleTensorMut::Always(tensor) => Some(tensor),
+            ModuleTensorMut::Optional(t) => t.as_mut(),
+        }
     }
 }
 
 // And the exact same with Mut :/
+
 #[derive(Debug, Default)]
 pub struct ModuleTensorsMut<'a> {
-    map: std::collections::HashMap<String, &'a mut Tensor>,
+    map: std::collections::HashMap<String, ModuleTensorMut<'a>>,
 }
 impl<'a> ModuleTensorsMut<'a> {
     pub fn new() -> Self {
         Default::default()
     }
     pub fn insert<T: Into<String>>(&mut self, k: T, tensor: &'a mut Tensor) {
-        let _ = self.map.insert(k.into(), tensor);
+        let _ = self.map.insert(k.into(), tensor.into());
     }
 
     pub fn insert_optional<T: Into<String>>(&mut self, k: T, tensor: &'a mut Option<Tensor>) {
         if let Some(tensor) = tensor {
-            let _ = self.map.insert(k.into(), tensor);
+            let _ = self.map.insert(k.into(), tensor.into());
         }
     }
     pub fn insert_namespaced(&mut self, k: &str, tensors: ModuleTensorsMut<'a>) {
@@ -296,13 +324,70 @@ impl<'a> ModuleTensorsMut<'a> {
         }
     }
     pub fn drain(&mut self) -> impl Iterator<Item = (String, &'a mut Tensor)> {
-        self.map.drain()
+        self.map.drain().filter_map(|(k, v)| match v {
+            ModuleTensorMut::Always(tensor) => Some((k, tensor)),
+            ModuleTensorMut::Optional(optional_tensor) => optional_tensor.as_mut().map(|a| (k, a)),
+        })
     }
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &&'a mut Tensor)> {
-        self.map.iter()
+    pub fn iter(&'a mut self) -> impl Iterator<Item = (&'a String, &'a mut Tensor)> {
+        self.map.iter_mut().filter_map(move |(k, v)| {
+            if let Some(z) = v.as_option() {
+                Some((k, z))
+            } else {
+                None
+            }
+        })
     }
+
+    /// Retrieve the optional into which the tensor by name may be stored.
+    ///
+    /// This allows clearing the tensor.
+    pub fn get_optional(&'a mut self, name: &str) -> Option<&'a mut Option<Tensor>> {
+        if let Some(value) = self.map.get_mut(name) {
+            match value {
+                ModuleTensorMut::Always(_) => None,
+                ModuleTensorMut::Optional(t) => Some(t),
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = &String> {
+        self.map.keys()
+    }
+
     pub fn extend<T: Iterator<Item = (String, &'a mut Tensor)>>(&mut self, t: T) {
-        self.map.extend(t)
+        self.map.extend(t.map(|(k, v)| (k, v.into())))
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct StateDictLoadOptions {
+    /// State dictionary keys must strictly be equivalent to the Module keys.
+    ///
+    /// Identical to the python functionality.
+    pub strict: bool,
+
+    /// Assign the tensors in the module instead of copying the data into them.
+    ///
+    /// This wipes the tensor properties in the module completely and uses those from the state dict.
+    ///
+    /// Identical to the python functionality.
+    pub assign: bool,
+    // /// Clear optional tensors that are not present in the state dictionary.
+    // ///
+    // /// This has no equivalent on the python side.
+    // pub clear_optional: bool,
+}
+
+impl Default for StateDictLoadOptions {
+    fn default() -> Self {
+        Self {
+            strict: true,
+            assign: false,
+            //   clear_optional: false,
+        }
     }
 }
 
@@ -395,11 +480,60 @@ pub trait Module: std::fmt::Debug + std::any::Any {
         }
         Ok(d)
     }
+
     /// Load a state dict into this layer.
-    fn load_state_dict(&mut self, dict: &dyn StateDictReader) -> StableTorchResult<()> {
-        for (k, v) in self.tensors_mut().drain() {
-            *v = dict.ten_required(&k)?.to_owned()?;
+    /*
+     Notes from the python side:
+        Loading a state dict raises if the tensor sizes don't match exactly.
+        Loading a state dict raises if any tensor is present that was not expected.
+        Loading a state dict raises for any tensor that is expected but missing.
+
+        In short, it is super strict.
+
+        That's less than ideal, because tensor size having to match is more annoying than just having to match the topology
+        with the python side.
+
+        Maybe:
+        struct LoadOptions{
+            pub check_tensor_size: bool,
+            pub allow_unused_tensors: bool,
         }
+
+        That allows enforcing the tensor size.
+        And allow_unused_tensors = false captures situations where the rust side has Option<Tensor>'s with None, that are in the dict?
+        It doesn't allow clearing Options though.... maybe clear_optional: bool
+
+         https://docs.pytorch.org/docs/2.13/generated/torch.nn.Module.html#torch.nn.Module.load_state_dict
+         strict (bool, optional) – whether to strictly enforce that the keys in state_dict match the keys returned by this module’s state_dict() function. Default: True
+         assign (bool, optional) – When set to False, the properties of the tensors in the current module are preserved whereas setting it to True preserves properties of the Tensors in the state dict.
+
+        but that doesn't handle the current signatures...
+        Do we also want to be able to inject metadata? It can be convenient if the model topology can be in the safetensors metadata.
+    */
+    fn load_state_dict(
+        &mut self,
+        dict: &dyn StateDictReader,
+        options: &StateDictLoadOptions,
+    ) -> StableTorchResult<()> {
+        if options.strict {
+            let existing_keys = dict.keys();
+            let desired_keys: HashSet<String> =
+                self.tensors().iter().map(|(a, _t)| a.clone()).collect();
+            let too_many_keys: HashSet<&String> = existing_keys.difference(&desired_keys).collect();
+            if !too_many_keys.is_empty() {
+                anyhow::bail!("strict mode enabled got too many keys: {too_many_keys:?}");
+            }
+        }
+
+        for (k, v) in self.tensors_mut().drain() {
+            if options.assign {
+                *v = dict.ten_required(&k)?.to_owned()?;
+            } else {
+                // Copy from the tensor, keeping its properties.
+                v.copy_from_tensor(&dict.ten_required(&k)?)?
+            }
+        }
+
         Ok(())
     }
 
@@ -431,7 +565,7 @@ pub trait Module: std::fmt::Debug + std::any::Any {
 mod test {
     use super::super::{Conv2d, Linear, Sequential};
     use super::*;
-    use crate::prelude::*;
+    use crate::{DType, prelude::*};
 
     #[test]
     fn test_flash_powder_state_dict() -> StableTorchResult<()> {
@@ -443,6 +577,15 @@ mod test {
         assert_eq!(s.add_buffer("foo", one.clone()).is_err(), true);
         s.add_buffer("foo.bar", two.clone())?;
         s.add_buffer("foo.bar.buz", three.clone())?;
+
+        assert_eq!(
+            s.keys(),
+            HashSet::<String>::from([
+                "foo".to_owned(),
+                "foo.bar".to_owned(),
+                "foo.bar.buz".to_owned()
+            ])
+        );
 
         // assert_eq!(s.tensor("foo").unwrap().as_f64()?, &1.0);
         assert_eq!(s.ten("foo").unwrap().as_f64()?, &1.0);
@@ -456,10 +599,15 @@ mod test {
         assert_eq!(foo.ten("bar").unwrap().as_f64()?, &2.0);
         // assert_eq!(foo.tensor("bar.buz").unwrap().as_f64()?, &3.0);
         assert_eq!(foo.ten("bar.buz").unwrap().as_f64()?, &3.0);
+        assert_eq!(
+            foo.keys(),
+            HashSet::<String>::from(["bar".to_owned(), "bar.buz".to_owned()])
+        );
 
         let bar = foo.namespaced("bar");
         // assert_eq!(bar.tensor("buz").unwrap().as_f64()?, &3.0);
         assert_eq!(bar.ten("buz").unwrap().as_f64()?, &3.0);
+        assert_eq!(bar.keys(), HashSet::<String>::from(["buz".to_owned()]));
         Ok(())
     }
 
@@ -503,7 +651,7 @@ mod test {
         println!("s: {s:?}");
 
         // THis works, but it's hardly a test.
-        seq_root.load_state_dict(&s)?;
+        seq_root.load_state_dict(&s, &Default::default())?;
 
         // let z = seq_root.get_mut(0).unwrap();
         // This is quite the mouth ful :/
@@ -542,11 +690,141 @@ mod test {
         assert_ne!(format!("{:?}", seq_root), seq_root_at_start);
 
         // Now load the state dict.
-        seq_root.load_state_dict(&s)?;
+
+        seq_root.load_state_dict(&s, &Default::default())?;
 
         // Now it should be identical to the start, that confirms we have loaded all tensors again.
         assert_eq!(format!("{:?}", seq_root), seq_root_at_start);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_save_load_options() -> StableTorchResult<()> {
+        let f64_one: Tensor = 0.0.try_into()?;
+        assert_eq!(f64_one.dtype(), DType::F64);
+
+        let f32_2: Tensor = 2.0f32.try_into()?;
+        assert_eq!(f32_2.dtype(), DType::F32);
+
+        {
+            //  strict enabled, one key too many in source state dict
+
+            let linear1 = Linear {
+                weight: f64_one.clone(),
+                bias: Some(f64_one.clone()),
+            };
+            let l1_dict = linear1.state_dict()?;
+
+            let mut linear2 = Linear {
+                weight: f32_2.clone(),
+                bias: None,
+            };
+            let options = StateDictLoadOptions {
+                strict: true,
+                assign: false,
+                clear_optional: false,
+            };
+            let r = linear2.load_state_dict(&l1_dict, &options);
+            assert!(r.is_err());
+            assert_eq!(
+                format!("{:?}", r.err().unwrap()),
+                "strict mode enabled got too many keys: {\"bias\"}"
+            );
+        }
+
+        {
+            //  strict enabled, one key missing in source, this is a normal 'missing required tensor'.
+
+            let linear1 = Linear {
+                weight: f64_one.clone(),
+                bias: None,
+            };
+            let l1_dict = linear1.state_dict()?;
+
+            let mut linear2 = Linear {
+                weight: f32_2.clone(),
+                bias: Some(f64_one.clone()),
+            };
+            let options = StateDictLoadOptions {
+                strict: true,
+                assign: false,
+                clear_optional: false,
+            };
+            let r = linear2.load_state_dict(&l1_dict, &options);
+            assert!(r.is_err());
+
+            assert_eq!(
+                format!("{:?}", r.err().unwrap()),
+                "missing required tensor 'bias'"
+            );
+        }
+
+        {
+            // Next, assign equals false means it should keep properties and copy values.
+
+            let linear1 = Linear {
+                weight: f64_one.clone(),
+                bias: None,
+            };
+            let l1_dict = linear1.state_dict()?;
+
+            let mut linear2 = Linear {
+                weight: f32_2.clone(),
+                bias: None,
+            };
+            let options = StateDictLoadOptions {
+                strict: false,
+                assign: false,
+                clear_optional: false,
+            };
+            linear2.load_state_dict(&l1_dict, &options)?;
+            assert_eq!(linear2.weight.dtype(), DType::F32);
+        }
+
+        {
+            // Next, assign equals true means the original source tensor properties are blown away.
+
+            let linear1 = Linear {
+                weight: f64_one.clone(),
+                bias: None,
+            };
+            let l1_dict = linear1.state_dict()?;
+
+            let mut linear2 = Linear {
+                weight: f32_2.clone(),
+                bias: None,
+            };
+            let options = StateDictLoadOptions {
+                strict: false,
+                assign: true,
+                clear_optional: false,
+            };
+            linear2.load_state_dict(&l1_dict, &options)?;
+            assert_eq!(linear2.weight.dtype(), DType::F64);
+        }
+
+        if false {
+            // Finally, check if we can clear optionals if they're not present.
+            let linear1 = Linear {
+                weight: f64_one.clone(),
+                bias: None,
+            };
+            let l1_dict = linear1.state_dict()?;
+
+            let mut linear2 = Linear {
+                weight: f32_2.clone(),
+                bias: Some(f64_one.clone()),
+            };
+            let options = StateDictLoadOptions {
+                strict: false,
+                assign: false,
+                clear_optional: true,
+            };
+            linear2.load_state_dict(&l1_dict, &options)?;
+            assert!(linear2.bias.is_none());
+            todo!();
+        }
         Ok(())
     }
 }
