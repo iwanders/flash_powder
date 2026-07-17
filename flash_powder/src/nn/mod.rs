@@ -6,6 +6,7 @@
 //!
 //! Core trait is [`Module`], which also provides plumbing to tensors through [`StateDictReader`].
 
+pub mod functional;
 pub mod layer;
 pub mod module;
 pub use layer::*;

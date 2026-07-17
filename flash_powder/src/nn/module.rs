@@ -407,7 +407,7 @@ impl Default for StateDictLoadOptions {
 /// An example of how this trait looks, for a real layer like Conv2D:
 ///
 /// ```
-///  use flash_powder::{prelude::*, functional, Tensor, Ten};
+///  use flash_powder::{prelude::*, nn::functional, Tensor, Ten};
 ///  use flash_powder::nn::module::{Module, ModuleTensors, ModuleTensorsMut};
 ///  #[derive(Debug, Clone)]
 ///  pub struct Conv2d {

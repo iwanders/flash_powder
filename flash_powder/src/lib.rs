@@ -32,7 +32,7 @@ Todo;
         - mean(tensor) https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L4041
         - and mean(&self, mean_options: &MeanOptions) are already ruined :(
         - Since overloads can always be added, we should probably always just use the full name with _ in between?
-    - Should we move functional into nn?
+
 Nice to have:
     - Printing with scientific mode / int mode, see comment in printing.rs
     - Summarized printing without copying the entire tensor to contiguous and cpu, only copy what is printed.
@@ -54,7 +54,6 @@ pub mod torch;
 pub mod core_methods;
 pub mod data;
 pub mod factory;
-pub mod functional;
 pub mod index;
 pub mod properties;
 pub mod size;

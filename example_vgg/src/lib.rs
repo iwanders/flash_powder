@@ -13,7 +13,7 @@
 use anyhow::bail;
 
 use flash_powder as fp;
-use flash_powder::{Ten, Tensor, functional, nn, prelude::*};
+use flash_powder::{Ten, Tensor, nn, nn::functional, prelude::*};
 use nn::module::{Module, ModuleTensors, ModuleTensorsMut};
 
 // -------------- VGG Implementation --------------
