@@ -276,6 +276,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "flash_powder",
+ "flash_powder_image",
  "flash_powder_safetensors",
  "image",
 ]

@@ -15,6 +15,7 @@ members = [
 torch_stable = { version = "0.1.0", path = "./torch_stable/"}
 flash_powder = { version = "0.1.0", path = "./flash_powder/"}
 flash_powder_safetensors = { version = "0.1.0", path = "./flash_powder_safetensors/"}
+flash_powder_image = { version = "0.1.0", path = "./flash_powder_image/"}
 example_vgg = { version = "0.1.0", path = "./example_vgg/"}
 
 

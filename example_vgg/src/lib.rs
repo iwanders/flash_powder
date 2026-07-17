@@ -14,6 +14,7 @@ use anyhow::bail;
 
 use flash_powder as fp;
 use flash_powder::{Ten, Tensor, nn, nn::functional, prelude::*};
+use flash_powder_image::prelude::*;
 use nn::module::{Module, ModuleTensors, ModuleTensorsMut};
 
 // -------------- VGG Implementation --------------
@@ -104,45 +105,6 @@ fn make_layers(cfg: &[u32]) -> Result<nn::Sequential, anyhow::Error> {
     Ok(features)
 }
 
-// -------------- image::DynamicImage to fp::Tensor --------------
-/// Convert dynamic image into [1, 3, h, w] Tensor as floats.
-fn image_to_float_tensor(
-    image: &image::DynamicImage,
-    use_cuda: bool,
-) -> Result<fp::Tensor, anyhow::Error> {
-    let img = image.to_rgb8();
-
-    // Lets first just tensorify the image, first create an empty tensor.
-    let mut t = fp::Tensor::zeros(
-        &[img.height() as usize, img.width() as usize, 3],
-        &fp::factory::TensorOptions {
-            dtype: Some(fp::DType::U8),
-            ..Default::default()
-        },
-    )?;
-    // Copy in the data.
-    t.data_mut()?.copy_from_slice(img.as_raw().as_slice());
-
-    // Convert that into a float tensor and multiply it by 255.0
-    let img_float = t.to(&fp::factory::ToOptions {
-        dtype: Some(fp::DType::F32),
-        ..Default::default()
-    })?;
-    let divisor: Tensor = 255.0.try_into()?;
-    let img_tensor_ready = img_float.div(&divisor)?;
-
-    let w = img_tensor_ready.shape()[1];
-    let h = img_tensor_ready.shape()[0];
-
-    let channels_stacked = img_tensor_ready.permute(&[2, 0, 1])?;
-    let with_batch = channels_stacked.view(&[1, 3, h, w])?.to_owned()?;
-    if use_cuda {
-        Ok(with_batch.to(&fp::Device::CUDA.into())?)
-    } else {
-        Ok(with_batch)
-    }
-}
-
 pub fn main() -> Result<(), anyhow::Error> {
     use std::path::PathBuf;
 
@@ -170,10 +132,13 @@ pub fn main() -> Result<(), anyhow::Error> {
 
     // Move to cuda if available.
     let use_cuda = fp::torch::cuda::is_available();
+    let device = if use_cuda {
+        fp::Device::CUDA
+    } else {
+        fp::Device::CPU
+    };
     println!("cuda available? {use_cuda:?}");
-    if use_cuda {
-        vgg.to(&fp::Device::CUDA.into())?
-    }
+    vgg.to(&device.into())?;
 
     // Print how to interpret the returned value.
     println!(
@@ -183,15 +148,13 @@ pub fn main() -> Result<(), anyhow::Error> {
 
     // Iterate over the input arguments and run the network.
     for argument in std::env::args().skip(1) {
-        let img = image::ImageReader::open(&argument)?.decode()?;
-        let channels_stacked = image_to_float_tensor(&img, use_cuda)?;
+        let img = Tensor::read_image(&argument)?.image_floatify(&device.into())?;
+        let img = img.unsqueeze(0)?;
 
-        let r = vgg
-            .forward(&channels_stacked.ten()?)?
-            .to(&flash_powder::factory::ToOptions {
-                device: Some(fp::Device::CPU),
-                ..Default::default()
-            })?;
+        let r = vgg.forward(&img)?.to(&flash_powder::factory::ToOptions {
+            device: Some(fp::Device::CPU),
+            ..Default::default()
+        })?;
         // https://github.com/pytorch/vision/blob/499ca5103b5c6abdf1973651d6eb3db9dfecdfbd/torchvision/models/_meta.py#L7
         const INDEX_TO_LINE_NUMBER: usize = 8;
 

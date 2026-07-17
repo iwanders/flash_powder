@@ -11,6 +11,7 @@ license = "BSD-3-Clause"
 
 flash_powder = {workspace=true, features=["cuda" ]}
 flash_powder_safetensors = {workspace=true }
+flash_powder_image = {workspace=true }
 anyhow = {workspace=true }
 image = {version="0.25.10", features=["jpeg"]}
 [build-dependencies]
