@@ -260,7 +260,7 @@ mod test {
             x = torch.tensor([[1.0, 2.0],[3.0, 4.0]], dtype=torch.float)
         */
 
-        let d = Tensor::from(&[[1.0f32, 2.0], [3.0, 4.0]])?;
+        let d = Tensor::from([[1.0f32, 2.0], [3.0, 4.0]])?;
         assert_eq!(d.sizes(), &[2, 2]); // #PYTHON list(x.shape)
         assert_eq!(d.f32s_ref()?, &[1.0f32, 2.0, 3.0, 4.0]); // #PYTHON list(x.view(-1).tolist())
 

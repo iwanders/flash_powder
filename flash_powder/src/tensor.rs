@@ -263,7 +263,7 @@ mod test {
     #[test]
     fn test_flash_powder_ten_from_blob() -> StableTorchResult<()> {
         use crate::prelude::*;
-        let d = Tensor::from(&[[1.0f32, 2.0], [3.0, 4.0]])?;
+        let d = Tensor::from([[1.0f32, 2.0], [3.0, 4.0]])?;
 
         let data = d.data()?;
         let sizes = d.sizes();
@@ -271,8 +271,8 @@ mod test {
         let strides = d.strides();
         assert_eq!(strides, &[2, 1]);
         let options = BlobOptionsBytes {
-            sizes: sizes,
-            strides: strides,
+            sizes,
+            strides,
             dtype: d.dtype(),
         };
         assert_eq!(options.dtype, DType::F32);
@@ -280,7 +280,7 @@ mod test {
         let ten_thing = Ten::from_bytes(data, &options)?;
         assert!(d.is_equal(&ten_thing)?);
 
-        let u8_3x2 = Tensor::from(&[[1u8, 2], [3, 4], [5, 6]])?;
+        let u8_3x2 = Tensor::from([[1u8, 2], [3, 4], [5, 6]])?;
         println!("tensor: {:?}, shape: {:?}", u8_3x2, u8_3x2.shape());
         println!(
             "sizes: {:?}, strides: {:?}",
@@ -292,15 +292,15 @@ mod test {
         let sizes = &[3, 2];
         let strides = &[2, 1];
         let options = BlobOptionsBytes {
-            sizes: sizes,
-            strides: strides,
+            sizes,
+            strides,
             dtype: DType::U8,
         };
 
         let ten_3x2x1 = Ten::from_bytes(&data, &options)?;
         assert_eq!(&ten_3x2x1.shape(), &[3, 2]);
 
-        let u32_3x2 = Tensor::from(&[[1u32, 2], [3, 4], [5, 6]])?;
+        let u32_3x2 = Tensor::from([[1u32, 2], [3, 4], [5, 6]])?;
         println!("tensor: {:?}, shape: {:?}", u32_3x2, u32_3x2.shape());
         println!(
             "sizes: {:?}, strides: {:?}",
@@ -312,11 +312,11 @@ mod test {
         let sizes = &[3, 2];
         let strides = &[2, 1];
         let options = BlobOptionsBytes {
-            sizes: sizes,
-            strides: strides,
+            sizes,
+            strides,
             dtype: DType::U32,
         };
-        let ten_u16_3x2 = Ten::from_bytes(&data, &options)?;
+        let ten_u16_3x2 = Ten::from_bytes(data, &options)?;
         println!(
             "ten_u16_3x2: {:?}, shape: {:?}",
             ten_u16_3x2,

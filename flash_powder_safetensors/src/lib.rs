@@ -263,7 +263,7 @@ mod test {
     #[test]
     fn test_minimal() -> Result<(), anyhow::Error> {
         // We create some dummy safetensor data here:
-        let weight = fp::Tensor::from(&[[3.3f32]])?;
+        let weight = fp::Tensor::from([[3.3f32]])?;
         let content = vec![("weight", SafetensorView::new(&weight).unwrap())];
         let safetensor_bytes = safetensors::tensor::serialize(content, None)?;
 
@@ -279,7 +279,7 @@ mod test {
         assert!(
             new_linear
                 .weight
-                .is_equal(&fp::Tensor::from(&[[3.3f32]])?)?
+                .is_equal(&fp::Tensor::from([[3.3f32]])?)?
         );
 
         Ok(())

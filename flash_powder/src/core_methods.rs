@@ -695,7 +695,7 @@ mod test {
             d = torch.tensor(list(range(1,10)), dtype=torch.float).reshape([3,3])
         */
 
-        let d = Tensor::from(&[[1.0f32, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])?;
+        let d = Tensor::from([[1.0f32, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])?;
         assert_eq!(d.sizes(), &[3, 3]); // #PYTHON list(d.shape)
         assert_eq!(
             d.f32s_ref()?,
@@ -861,7 +861,7 @@ mod test {
             mean_1_double = d.mean(1, dtype=torch.double)
         */
 
-        let d = Tensor::from(&[[
+        let d = Tensor::from([[
             [1.0f32, 2.0, 3.0, 4.0],
             [5.0, 6.0, 7.0, 8.0],
             [9.0, 10.0, 11.0, 12.0],
@@ -912,7 +912,7 @@ mod test {
 
     #[test]
     fn test_flash_powder_full_view() -> StableTorchResult<()> {
-        let d = Tensor::from(&[[
+        let d = Tensor::from([[
             [1.0f32, 2.0, 3.0, 4.0],
             [5.0, 6.0, 7.0, 8.0],
             [9.0, 10.0, 11.0, 12.0],
@@ -944,7 +944,7 @@ mod test {
             d = torch.tensor(list(range(1,17)), dtype=torch.float).reshape([1,4,4])
         */
 
-        let d = Tensor::from(&[[
+        let d = Tensor::from([[
             [1.0f32, 2.0, 3.0, 4.0],
             [5.0, 6.0, 7.0, 8.0],
             [9.0, 10.0, 11.0, 12.0],
@@ -977,7 +977,7 @@ mod test {
                                [7, 8]]])
         */
 
-        let t = Tensor::from(&[[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])?;
+        let t = Tensor::from([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])?;
         assert_eq!(t.sizes(), &[2, 2, 2]); // #PYTHON list(t.shape)
 
         /*
@@ -1003,7 +1003,7 @@ mod test {
             r = torch.div(x, 0.5)
         */
 
-        let t = Tensor::from(&[0.3810f32, 1.2774, -0.2972, -0.3719, 0.4637])?;
+        let t = Tensor::from([0.3810f32, 1.2774, -0.2972, -0.3719, 0.4637])?;
         let denom: Tensor = 0.5.try_into()?;
         let r = t.div(&denom)?;
         assert_eq!(r.sizes(), &[5]); // #PYTHON list(r.shape)
@@ -1030,7 +1030,7 @@ mod test {
             r = torch.mul(x, 100.0)
         */
 
-        let t = Tensor::from(&[0.2015f32, -0.4255, 2.6087])?;
+        let t = Tensor::from([0.2015f32, -0.4255, 2.6087])?;
         let factor: Tensor = 100.0.try_into()?;
         let r = t.mul(&factor)?;
         assert_eq!(r.sizes(), &[3]); // #PYTHON list(r.shape)
@@ -1199,11 +1199,11 @@ mod test {
 
             combined = color_lookup[the_indices]
         */
-        let color_lookup = Tensor::from(&[[1.0f32, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])?;
+        let color_lookup = Tensor::from([[1.0f32, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])?;
         assert_eq!(color_lookup.sizes(), &[3, 3]); // #PYTHON list(color_lookup.shape)
         assert_eq!(color_lookup.dtype(), DType::F32); // #PYTHON color_lookup.dtype
 
-        let the_indices = Tensor::from(&[0i64, 1, 2, 2, 1, 0, 1, 2, 0])?;
+        let the_indices = Tensor::from([0i64, 1, 2, 2, 1, 0, 1, 2, 0])?;
         assert_eq!(the_indices.sizes(), &[9]); // #PYTHON list(the_indices.shape)
         assert_eq!(the_indices.dtype(), DType::I64); // #PYTHON the_indices.dtype
 
@@ -1335,7 +1335,7 @@ mod test {
             x = torch.tensor(list(range(1,9)), dtype=torch.int64).reshape([2,2,2])
             f = torch.flip(x, [0, 1])
         */
-        let d = Tensor::from(&[1i64, 2, 3, 4, 5, 6, 7, 8])?;
+        let d = Tensor::from([1i64, 2, 3, 4, 5, 6, 7, 8])?;
         let x = d.view(&[2, 2, 2])?;
         assert_eq!(x.i64s_ref()?, &[1, 2, 3, 4, 5, 6, 7, 8]); // #PYTHON x.ravel().tolist()
         assert_eq!(x.sizes(), &[2, 2, 2]); // #PYTHON list(x.shape)
@@ -1354,7 +1354,7 @@ mod test {
             v = torch.tensor(4)
             c = x >= v
         */
-        let d = Tensor::from(&[1i64, 2, 3, 4, 5, 6, 7, 8, 9])?;
+        let d = Tensor::from([1i64, 2, 3, 4, 5, 6, 7, 8, 9])?;
         let x = d.view(&[3, 3])?;
         assert_eq!(x.i64s_ref()?, &[1, 2, 3, 4, 5, 6, 7, 8, 9]); // #PYTHON x.ravel().tolist()
         assert_eq!(x.sizes(), &[3, 3]); // #PYTHON list(x.shape)

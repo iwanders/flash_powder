@@ -45,7 +45,7 @@ mod test {
         assert_eq!(F16(0x3c00).into_f64(), 1.0);
         assert_eq!(F16(0xc000).into_f64(), -2.0);
         assert_eq!(F16(0x7c00).into_f64(), f64::INFINITY);
-        assert_eq!(F16(0xfC00).into_f64(), f64::NEG_INFINITY);
+        assert_eq!(F16(0xfc00).into_f64(), f64::NEG_INFINITY);
         assert_eq!(F16(0x7e00).into_f64().is_nan(), true);
         assert_eq!(F16(0x4268).into_f64(), 3.203125);
         assert_eq!(F16(0x78EA).into_f64(), 40256.0);

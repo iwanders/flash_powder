@@ -453,7 +453,7 @@ mod test {
         let mut d = Tensor::zeros(&[6, 6], &Default::default())?;
         d.i_mut((0..3, 0..3))?.fill_f64(1.0)?;
         d.save_image("/tmp/fp_greyscale_f32.png").unwrap();
-        let img = image::ImageReader::open(&"/tmp/fp_greyscale_f32.png")?.decode()?;
+        let img = image::ImageReader::open("/tmp/fp_greyscale_f32.png")?.decode()?;
         assert!(matches!(img, image::DynamicImage::ImageLuma8(_)));
         println!("d: {d:?}");
         let floatified = img.to_tensor()?.image_floatify(&Default::default())?;
@@ -471,7 +471,7 @@ mod test {
         let mut d = Tensor::zeros(&[6, 6], &fp::DType::U8.into())?;
         d.i_mut((0..3, 0..3))?.fill_tensor(&u8_255)?;
         d.save_image("/tmp/fp_greyscale_u8.png").unwrap();
-        let img = image::ImageReader::open(&"/tmp/fp_greyscale_u8.png")?.decode()?;
+        let img = image::ImageReader::open("/tmp/fp_greyscale_u8.png")?.decode()?;
         assert!(matches!(img, image::DynamicImage::ImageLuma8(_)));
         let img = img.to_luma8();
         assert_eq!(img.get_pixel(0, 0), &image::Luma([255]));
@@ -483,7 +483,7 @@ mod test {
         let mut d = Tensor::zeros(&[6, 6], &fp::DType::U16.into())?;
         d.i_mut((0..3, 0..3))?.fill_tensor(&u16_255)?;
         d.save_image("/tmp/fp_greyscale_u16.png").unwrap();
-        let img = image::ImageReader::open(&"/tmp/fp_greyscale_u16.png")?.decode()?;
+        let img = image::ImageReader::open("/tmp/fp_greyscale_u16.png")?.decode()?;
         assert!(matches!(img, image::DynamicImage::ImageLuma8(_)));
         let v = Tensor::read_image("/tmp/fp_greyscale_u16.png")?.to(&fp::DType::U16.into())?;
         assert!(d.unsqueeze(0)?.is_equal(&v)?);
@@ -502,7 +502,7 @@ mod test {
         // Bottom right, white
         d.i_mut((.., 3..6, 3..6))?.fill_f64(1.0)?;
         d.save_image("/tmp/fp_rgb_f32.png").unwrap();
-        let img = image::ImageReader::open(&"/tmp/fp_rgb_f32.png")?.decode()?;
+        let img = image::ImageReader::open("/tmp/fp_rgb_f32.png")?.decode()?;
         assert!(matches!(img, image::DynamicImage::ImageRgb8(_)));
         let v = Tensor::read_image("/tmp/fp_rgb_f32.png")?
             .to(&fp::DType::F32.into())?
@@ -529,7 +529,7 @@ mod test {
         // Opacity for the middle section.
         d.i_mut((3, 1..5, 1..5))?.fill_f64(1.0)?;
         d.save_image("/tmp/fp_rgba_f32.png")?;
-        let img = image::ImageReader::open(&"/tmp/fp_rgba_f32.png")?.decode()?;
+        let img = image::ImageReader::open("/tmp/fp_rgba_f32.png")?.decode()?;
         assert!(matches!(img, image::DynamicImage::ImageRgba8(_)));
         let v = Tensor::read_image("/tmp/fp_rgba_f32.png")?
             .to(&fp::DType::F32.into())?
@@ -559,7 +559,7 @@ mod test {
         d.i_mut((1, 2, 0..6, 0..6))?.fill_f64(1.0)?; // second image in batch blue.
         d.i_mut((2, 1, 0..6, 0..6))?.fill_f64(1.0)?; // third image in batch green.
         d.save_image("/tmp/fp_rgb_b2.png").unwrap();
-        let img = image::ImageReader::open(&"/tmp/fp_rgb_b2.png")?.decode()?;
+        let img = image::ImageReader::open("/tmp/fp_rgb_b2.png")?.decode()?;
         assert!(matches!(img, image::DynamicImage::ImageRgb8(_)));
         let back = img.to_tensor()?;
         let square_255 = Tensor::ones(&[6, 6], &fp::DType::U8.into())?.mul(&u8_255)?;
@@ -587,7 +587,7 @@ mod test {
         d.i_mut((1, 2, 0..2, 0..6, 0..6))?.fill_f64(1.0)?; // third image in 2nd batch yellow
         d.save_image("/tmp/fp_rgb_2r_b2.png").unwrap();
 
-        let img = image::ImageReader::open(&"/tmp/fp_rgb_2r_b2.png")?.decode()?;
+        let img = image::ImageReader::open("/tmp/fp_rgb_2r_b2.png")?.decode()?;
         assert!(matches!(img, image::DynamicImage::ImageRgb8(_)));
         let back = img.to_tensor()?;
         // First square is red.
@@ -649,7 +649,7 @@ mod test {
         // Bottom right, white, this also sets the full opacity.
         d.i_mut((.., 3..6, 3..6))?.fill_f64(1.0)?;
         d.save_image("/tmp/fp_rgb_f32_flat.png")?;
-        let img = image::ImageReader::open(&"/tmp/fp_rgb_f32_flat.png")?
+        let img = image::ImageReader::open("/tmp/fp_rgb_f32_flat.png")?
             .decode()?
             .to_rgb8();
         let flat = img.as_flat_samples();

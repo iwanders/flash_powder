@@ -404,7 +404,7 @@ mod test {
             r = torch.nn.functional.conv2d(d, w)
         */
 
-        let d = Tensor::from(&[[
+        let d = Tensor::from([[
             [1.0f32, 2.0, 3.0, 4.0],
             [5.0, 6.0, 7.0, 8.0],
             [9.0, 10.0, 11.0, 12.0],
@@ -517,7 +517,7 @@ mod test {
             r = torch.nn.functional.conv_transpose2d(d, w)
         */
 
-        let d = Tensor::from(&[[
+        let d = Tensor::from([[
             [1.0f32, 2.0, 3.0, 4.0],
             [5.0, 6.0, 7.0, 8.0],
             [9.0, 10.0, 11.0, 12.0],
@@ -559,7 +559,7 @@ mod test {
             d = torch.tensor([-1.0, 0.0, 0.5, 1.0], dtype=torch.float)
             r = d.relu()
         */
-        let d = Tensor::from(&[-1.0f32, 0.0, 0.5, 1.0])?;
+        let d = Tensor::from([-1.0f32, 0.0, 0.5, 1.0])?;
 
         assert_eq!(d.sizes(), &[4]); // #PYTHON list(d.shape)
         let r = relu(&d)?;
@@ -574,7 +574,7 @@ mod test {
             d = torch.tensor(list(range(1,17)), dtype=torch.float).reshape([1,4,4])
             r = torch.nn.functional.max_pool2d(d, (2,2))
         */
-        let d = Tensor::from(&[[
+        let d = Tensor::from([[
             [1.0f32, 2.0, 3.0, 4.0],
             [5.0, 6.0, 7.0, 8.0],
             [9.0, 10.0, 11.0, 12.0],
@@ -619,7 +619,7 @@ mod test {
             #|PYTHON
             input = torch.tensor(list(range(1,5)), dtype=torch.float).reshape([1,1, 2,2])
         */
-        let d = Tensor::from(&[[1.0f32, 2.0], [3.0, 4.0]])?
+        let d = Tensor::from([[1.0f32, 2.0], [3.0, 4.0]])?
             .view(&[1, 1, 2, 2])?
             .to_owned()?;
         assert_eq!(d.sizes(), &[1, 1, 2, 2]); // #PYTHON list(input.shape)
@@ -719,8 +719,8 @@ mod test {
             v = torch.nn.functional.linear(x, w, b)
         */
 
-        let w = Tensor::from(&[[1.0f32, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])?;
-        let b = Tensor::from(&[1.0f32, 2.0, 3.0])?;
+        let w = Tensor::from([[1.0f32, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])?;
+        let b = Tensor::from([1.0f32, 2.0, 3.0])?;
         let x: Tensor = [5.0f32, 6.0, 7.0].try_into()?;
         assert_eq!(w.sizes(), &[3, 3]); // #PYTHON list(w.shape)
         assert_eq!(
@@ -766,7 +766,7 @@ mod test {
             s1 = torch.nn.functional.softmax(d, 1)
         */
 
-        let d = Tensor::from(&[[[1.0f32, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]])?;
+        let d = Tensor::from([[[1.0f32, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]])?;
         assert_eq!(d.sizes(), &[1, 3, 3]); // #PYTHON list(d.shape)
 
         let s0 = softmax_int(&d, 0, None)?;

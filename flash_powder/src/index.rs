@@ -396,7 +396,7 @@ mod test {
             d = torch.tensor(list(range(1,17)), dtype=torch.float).reshape([ 4,4])
         */
 
-        let d = Tensor::from(&[
+        let d = Tensor::from([
             [1.0f32, 2.0, 3.0, 4.0],
             [5.0, 6.0, 7.0, 8.0],
             [9.0, 10.0, 11.0, 12.0],
@@ -485,7 +485,7 @@ mod test {
             d = torch.tensor(list(range(1,17)), dtype=torch.float).reshape([ 4,4])
         */
 
-        let mut d = Tensor::from(&[
+        let mut d = Tensor::from([
             [1.0f32, 2.0, 3.0, 4.0],
             [5.0, 6.0, 7.0, 8.0],
             [9.0, 10.0, 11.0, 12.0],
@@ -542,7 +542,7 @@ mod test {
 
     #[test]
     fn test_flash_powder_indexing_non_contiguous_scalar() -> StableTorchResult<()> {
-        let d = Tensor::from(&[
+        let d = Tensor::from([
             [1.0f32, 2.0, 3.0, 4.0],
             [5.0, 6.0, 7.0, 8.0],
             [9.0, 10.0, 11.0, 12.0],

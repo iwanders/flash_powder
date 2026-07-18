@@ -372,7 +372,7 @@ mod test {
             z = torch.narrow(d, 1, 0, 3)
         */
 
-        let mut d = Tensor::from(&[
+        let mut d = Tensor::from([
             [1.0f32, 2.0, 3.0, 4.0],
             [5.0, 6.0, 7.0, 8.0],
             [9.0, 10.0, 11.0, 12.0],
