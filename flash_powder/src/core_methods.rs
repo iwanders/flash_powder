@@ -746,7 +746,7 @@ mod test {
 
         /*
             #|PYTHON
-            d = torch.tensor(d)
+            d = d.detach().clone()
             x = torch.narrow(d, 0, 0, 2)
             x[0,0] = 15.0
             x[0,2] = 16.0

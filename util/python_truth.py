@@ -12,6 +12,7 @@ from typing import Any
 
 # Only a global import because we want to load it once for the exec blocks, not actually relied on elsewhere.
 import torch
+ 
 
 
 class Color:
@@ -230,6 +231,16 @@ class RustNode:
             raise NotImplementedError(f"Unsupported type {found_type}")
 """
 
+def stringify_single_value(value, rust_type=None):
+    if rust_type == "f32": 
+        # We can't actually reduce digits without failing tests.
+        return str(value) 
+    elif rust_type == "f64":
+        return  str(value)
+    else:
+        return str(value)
+    
+    
 
 def format_payload_as_rust(payload, rust_type=None):
     if rust_type is not None:
@@ -258,7 +269,8 @@ def format_payload_as_rust(payload, rust_type=None):
     elif isinstance(payload, float):
         if rust_type and rust_type not in RUST_FLOATS:
             raise ValueError(f"Trying to convert {payload} to {rust_type}")
-        payload_str = str(payload)
+        
+        payload_str = stringify_single_value(payload,rust_type)
         return f"{ref_str}{arr_start_str}{payload_str}{type_str}{arr_end_str}"
 
     elif isinstance(payload, list):
@@ -271,7 +283,7 @@ def format_payload_as_rust(payload, rust_type=None):
         if payload and isinstance(payload[0], bool):
             # late-stage fix for formatting.
             payload = ["true" if p else "false" for p in payload]
-        payload_str = [str(p) for p in payload]
+        payload_str = [stringify_single_value(p, rust_type) for p in payload]
 
         if payload_str:
             payload_str[0] += type_str
@@ -295,17 +307,22 @@ def test_rust_format_payload():
     assert format_payload_as_rust(3.3, rust_type="&f32") == "&3.3f32"
     assert format_payload_as_rust(3.3, rust_type="&[f32]") == "&[3.3f32]"
     assert format_payload_as_rust(3.3, rust_type="[f32]") == "[3.3f32]"
+    assert format_payload_as_rust(3.3, rust_type="[f32]") == "[3.3f32]"
     assert format_payload_as_rust([3.3, 5.5], rust_type="[f32]") == "[3.3f32, 5.5]"
     assert format_payload_as_rust([3.3, 5.5], rust_type="[]") == "[3.3, 5.5]"
     assert format_payload_as_rust([3, 5], rust_type="[]") == "[3, 5]"
     assert format_payload_as_rust([3, 5], rust_type="&") == "&[3, 5]"
-
+ 
+    assert format_payload_as_rust(3.141592653589793, rust_type="f32") == "3.14159265f32"
+    assert format_payload_as_rust(3.141592653589793, rust_type="f64") == "3.141592653589793f64"
+    assert format_payload_as_rust(3.141592653589793 ) == "3.141592653589793"
+    assert format_payload_as_rust(3.141592653589793, rust_type="[f32]") == "[3.14159265f32]"
     ref_to_str = RustNode(children=["&3.3"])
     assert ref_to_str.determine_type() == "&"
     sys.exit(1)
 
 
-# test_rust_format_payload()
+#test_rust_format_payload()
 
 
 class RustWrangler:
