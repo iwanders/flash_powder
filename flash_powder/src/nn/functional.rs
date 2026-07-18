@@ -1,5 +1,5 @@
 //! This holds functions that pytorch puts into the functional module.
-use crate::{properties::TensorProperties, DType};
+use crate::{DType, properties::TensorProperties};
 use anyhow::bail;
 use torch_stable::{
     aoti_torch::StableIValue, stable::tensor::Tensor as StableTensor, unsafe_call_dispatch_bail,
@@ -235,7 +235,7 @@ pub fn interpolate<T: TensorAccess + TensorProperties>(
     options: &InterpolateOptions,
 ) -> StableTorchResult<Tensor> {
     let dim = input.dim() - 2; // Number of spatial dimensions.
-                               // Validation in https://github.com/pytorch/pytorch/blob/v2.11.0/torch/nn/functional.py#L4715-L4761 :o
+    // Validation in https://github.com/pytorch/pytorch/blob/v2.11.0/torch/nn/functional.py#L4715-L4761 :o
 
     let mut scale_factors: Option<&[f64]> = None;
     let mut output_size: Option<&[i64]> = None;
@@ -641,7 +641,9 @@ mod test {
         assert_eq!(m.sizes(), &[1, 1, 4, 4]); // #PYTHON list(m.shape)
         assert_eq!(
             m.f32s_ref()?,
-            &[1.0f32, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 3.0, 3.0, 4.0, 4.0]
+            &[
+                1.0f32, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 3.0, 3.0, 4.0, 4.0
+            ]
         ); // #PYTHON list(m.view(-1).tolist())
 
         // Bilinear 2

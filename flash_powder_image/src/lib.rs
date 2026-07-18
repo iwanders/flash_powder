@@ -8,6 +8,7 @@
 //!
 
 use flash_powder as fp;
+use flash_powder::nn::functional;
 use fp::Tensor;
 
 use anyhow::bail;
@@ -321,6 +322,12 @@ pub trait TensorImageOperations {
     /// ```
     ///
     fn image_scale_to_domain(&self) -> StableTorchResult<Tensor>;
+
+    fn image_resize(
+        &self,
+        size: (usize, usize),
+        mode: functional::InterpolateAlgorithm,
+    ) -> StableTorchResult<Tensor>;
 }
 impl TensorImageOperations for Tensor {
     fn image_floatify(&self, options: &fp::factory::ToOptions) -> StableTorchResult<Tensor> {
@@ -328,6 +335,14 @@ impl TensorImageOperations for Tensor {
     }
     fn image_scale_to_domain(&self) -> StableTorchResult<Tensor> {
         self.ten()?.image_scale_to_domain()
+    }
+
+    fn image_resize(
+        &self,
+        size: (usize, usize),
+        mode: functional::InterpolateAlgorithm,
+    ) -> StableTorchResult<Tensor> {
+        self.ten()?.image_resize(size, mode)
     }
 }
 impl<'a> TensorImageOperations for fp::Ten<'a> {
@@ -359,6 +374,27 @@ impl<'a> TensorImageOperations for fp::Ten<'a> {
         let max = self.max()?;
         let span = max.sub(&min)?;
         self.sub(&min)?.div(&span)
+    }
+
+    fn image_resize(
+        &self,
+        size: (usize, usize),
+        mode: functional::InterpolateAlgorithm,
+    ) -> StableTorchResult<Tensor> {
+        let options = functional::InterpolateOptions {
+            size: Some([size.0 as i64, size.1 as i64, 0]),
+            mode: mode,
+            ..Default::default()
+        };
+        let with_more_dim = if self.dim() == 2 {
+            self.unsqueeze(0)?.unsqueeze(0)?
+        } else if self.dim() == 3 {
+            self.unsqueeze(0)?
+        } else {
+            self.ten()?
+        };
+
+        functional::interpolate(&with_more_dim, &options)
     }
 }
 
@@ -680,6 +716,28 @@ mod test {
 
         assert!(back_to_255.is_equal(&ten_to_255)?);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_image_resize() -> StableTorchResult<()> {
+        // Test an rgba image.
+        let mut d = Tensor::zeros(&[3, 6, 6], &Default::default())?;
+        // Top left, R
+        d.i_mut((0, 0..3, 0..3))?.fill_f64(1.0)?;
+        // Bottom left, G
+        d.i_mut((1, 3..6, 0..3))?.fill_f64(1.0)?;
+        // Top right Blue
+        d.i_mut((2, 0..3, 3..6))?.fill_f64(1.0)?;
+        // Bottom right, white, this also sets the full opacity.
+        d.i_mut((.., 3..6, 3..6))?.fill_f64(1.0)?;
+
+        let d_larger = d.image_resize((100, 100), functional::InterpolateAlgorithm::Nearest)?;
+        d_larger.save_image("/tmp/fp_rgb_image_resize_100x100.png")?;
+
+        let d_back_small = d.image_resize((6, 6), functional::InterpolateAlgorithm::Nearest)?;
+        d_back_small.save_image("/tmp/fp_rgb_image_resize_6x6.png")?;
+        assert!(d.is_equal(&d_back_small.squeeze()?)?);
         Ok(())
     }
 }
