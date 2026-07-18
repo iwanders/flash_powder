@@ -326,13 +326,9 @@ impl<'a> ModuleTensorsMut<'a> {
         })
     }
     pub fn iter(&'a mut self) -> impl Iterator<Item = (&'a String, &'a mut Tensor)> {
-        self.map.iter_mut().filter_map(move |(k, v)| {
-            if let Some(z) = v.as_option() {
-                Some((k, z))
-            } else {
-                None
-            }
-        })
+        self.map
+            .iter_mut()
+            .filter_map(move |(k, v)| v.as_option().map(|z| (k, z)))
     }
 
     /// Retrieve the optional into which the tensor by name may be stored.

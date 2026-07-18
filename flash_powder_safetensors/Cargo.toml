@@ -25,3 +25,6 @@ torch_stable = {workspace=true, features=[ ]}
 
 # Whether to link against torch_cuda.
 #cuda = ["flash_powder/cuda"]
+
+[lints]
+workspace = true

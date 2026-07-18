@@ -22,3 +22,6 @@ cc={workspace=true}
 cuda = []
 
 default=[ ]
+
+[lints]
+workspace = true

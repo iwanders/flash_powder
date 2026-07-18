@@ -29,3 +29,6 @@ image = {workspace=true, features=["png"]}
 
 # Whether to link against torch_cuda.
 #cuda = ["flash_powder/cuda"]
+
+[lints]
+workspace = true

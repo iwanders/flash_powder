@@ -29,3 +29,11 @@ tinyvec = "1.11.0"
 # Very broad version, such that the consumer can pick it if they want to.
 safetensors = "0.8"
 image = {version="0.25" , default-features=false}
+
+
+[workspace.lints.clippy]
+# I want to be able to do assert_eq!(a.is_contiguous(), false); instead of assert_eq!(!a.is_contiguous()).
+#![allow(clippy::bool_assert_comparison)]
+bool_assert_comparison = "allow"
+#![allow(clippy::excessive_precision)]
+excessive_precision = "allow"

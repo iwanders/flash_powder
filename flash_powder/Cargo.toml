@@ -24,3 +24,6 @@ torch_stable = {workspace=true, features=[ ]}
 
 # Whether to link against torch_cuda.
 cuda = ["torch_stable/cuda"]
+
+[lints]
+workspace = true

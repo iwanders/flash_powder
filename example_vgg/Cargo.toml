@@ -16,3 +16,6 @@ anyhow = {workspace=true }
 image = {version="0.25.10", features=["jpeg"]}
 [build-dependencies]
 flash_powder = {workspace=true, features=["cuda" ]}
+
+[lints]
+workspace = true
