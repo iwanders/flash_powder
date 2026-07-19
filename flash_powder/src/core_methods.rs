@@ -538,6 +538,25 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         let indices: StableTensor = stack[1].try_into()?;
         Ok((Tensor::new(values), Tensor::new(indices)))
     }
+
+    /// Move tensor to CPU
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L7231-L7232)
+    /// - [tensor method](https://docs.pytorch.org/docs/2.13/generated/torch.Tensor.cpu.html)
+    fn cpu(&self) -> StableTorchResult<Tensor> {
+        let self_array: &[StableIValue] = &[(self.get_tensor()).into()];
+        let mut stack: [StableIValue; 1] = [self_array.into()];
+        unsafe_call_dispatch_panic!("aten::_to_cpu", "", stack.as_mut_slice());
+        let v: Vec<StableIValue> = stack[0].try_into()?;
+        let t: StableTensor = v
+            .first()
+            .copied()
+            .ok_or(anyhow::format_err!("no value to retrieve"))?
+            .try_into()?;
+        // That function returns the same value if its already on the CPU, we MUST return a COW flavour.
+        let r: Tensor = Tensor::new(t).lazy_clone()?;
+        Ok(r)
+    }
 }
 impl CoreMethods for Tensor {}
 impl<'a> CoreMethods for Ten<'a> {}
@@ -1552,6 +1571,26 @@ mod test {
 
         assert_eq!(b.f32s_ref()?, &[-0.5, -1.0, 0.0, -0.5, -1.0]); // #PYTHON b.ravel().tolist()
         assert_eq!(b.sizes(), &[5]); // #PYTHON list(b.shape)
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_to_cpu() -> StableTorchResult<()> {
+        let a_in: Tensor = [-3.0f32, -2.0, -1.0, 1.0, 2.0, 3.0].try_into()?;
+
+        let a_in_cpu = a_in.cpu()?;
+        assert!(a_in.is_equal(&a_in_cpu)?);
+
+        #[cfg(feature = "cuda")]
+        {
+            let a_in: Tensor = [-3.0f32, -2.0, -1.0, 1.0, 2.0, 3.0].try_into()?;
+            let a_cuda = a_in.to(&crate::Device::CUDA.into())?;
+            assert_eq!(a_cuda.device(), crate::Device::CUDA);
+
+            let a_in_cpu = a_cuda.cpu()?;
+            assert!(a_in.is_equal(&a_in_cpu)?);
+        }
+
         Ok(())
     }
 }
