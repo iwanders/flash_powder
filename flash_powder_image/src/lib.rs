@@ -323,9 +323,14 @@ pub trait TensorImageOperations {
     ///
     fn image_scale_to_domain(&self) -> StableTorchResult<Tensor>;
 
+    /// Resize an image to be the desired size. Size is [height, width].
+    ///
+    /// Use Nearest or Bilinear as mode.
+    ///
+    /// Needs some further testing, and should we introduce an ResizeMode that is Nearest/Bilinear only?
     fn image_resize(
         &self,
-        size: (usize, usize),
+        size: [usize; 2],
         mode: functional::InterpolateAlgorithm,
     ) -> StableTorchResult<Tensor>;
 }
@@ -339,7 +344,7 @@ impl TensorImageOperations for Tensor {
 
     fn image_resize(
         &self,
-        size: (usize, usize),
+        size: [usize; 2],
         mode: functional::InterpolateAlgorithm,
     ) -> StableTorchResult<Tensor> {
         self.ten()?.image_resize(size, mode)
@@ -378,11 +383,11 @@ impl<'a> TensorImageOperations for fp::Ten<'a> {
 
     fn image_resize(
         &self,
-        size: (usize, usize),
+        size: [usize; 2],
         mode: functional::InterpolateAlgorithm,
     ) -> StableTorchResult<Tensor> {
         let options = functional::InterpolateOptions {
-            size: Some([size.0 as i64, size.1 as i64, 0]),
+            size: Some([size[0] as i64, size[1] as i64, 0]),
             mode: mode,
             ..Default::default()
         };
@@ -732,10 +737,10 @@ mod test {
         // Bottom right, white, this also sets the full opacity.
         d.i_mut((.., 3..6, 3..6))?.fill_f64(1.0)?;
 
-        let d_larger = d.image_resize((100, 100), functional::InterpolateAlgorithm::Nearest)?;
+        let d_larger = d.image_resize([100, 100], functional::InterpolateAlgorithm::Nearest)?;
         d_larger.save_image("/tmp/fp_rgb_image_resize_100x100.png")?;
 
-        let d_back_small = d.image_resize((6, 6), functional::InterpolateAlgorithm::Nearest)?;
+        let d_back_small = d.image_resize([6, 6], functional::InterpolateAlgorithm::Nearest)?;
         d_back_small.save_image("/tmp/fp_rgb_image_resize_6x6.png")?;
         assert!(d.is_equal(&d_back_small.squeeze()?)?);
         Ok(())
