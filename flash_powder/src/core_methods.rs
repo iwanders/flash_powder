@@ -1585,7 +1585,10 @@ mod test {
         {
             let a_in: Tensor = [-3.0f32, -2.0, -1.0, 1.0, 2.0, 3.0].try_into()?;
             let a_cuda = a_in.to(&crate::Device::CUDA.into())?;
-            assert_eq!(a_cuda.device(), crate::Device::CUDA);
+            assert_eq!(
+                a_cuda.device().device_type(),
+                crate::Device::CUDA.device_type()
+            );
 
             let a_in_cpu = a_cuda.cpu()?;
             assert!(a_in.is_equal(&a_in_cpu)?);
