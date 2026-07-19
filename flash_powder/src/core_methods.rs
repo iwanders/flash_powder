@@ -52,6 +52,18 @@ impl Default for TopKOptions {
         }
     }
 }
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+pub enum RoundingMode {
+    /// Default behaviour, no rounding, if both operands are integers, the result is a scalar.
+    #[default]
+    Default,
+    /// Rounds the division towards zero. Equivalent to C-style integer division.
+    Truncate,
+    /// Rounds the results of the division down. Equivalent to floor division in Python `//` and numpy's floor_divide
+    Floor,
+}
+
 /// Core methods that require const access.
 ///
 /// See the [`core_methods`][crate::core_methods] module for description of this trait's functionality.
@@ -253,6 +265,31 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     fn div<T: TensorAccess>(&self, other: &T) -> StableTorchResult<Tensor> {
         let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), other.get_tensor().into()];
         unsafe_call_dispatch_panic!("aten::div", "Tensor", stack.as_mut_slice());
+        let r: Tensor = Tensor::new(stack[0].try_into().unwrap());
+        Ok(r)
+    }
+
+    /// Division with rouding mode
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L2106-L2112)
+    /// - [tensor method](https://docs.pytorch.org/docs/2.13/generated/torch.Tensor.div.html)
+    /// - [pytorch method](https://docs.pytorch.org/docs/2.13/generated/torch.div.html#torch.div)
+    fn div_mode<T: TensorAccess>(
+        &self,
+        other: &T,
+        mode: RoundingMode,
+    ) -> StableTorchResult<Tensor> {
+        let string = match mode {
+            RoundingMode::Default => None,
+            RoundingMode::Truncate => Some("trunc"),
+            RoundingMode::Floor => Some("floor"),
+        };
+        let mut stack: [StableIValue; 3] = [
+            (self.get_tensor()).into(),
+            other.get_tensor().into(),
+            (&string).into(),
+        ];
+        unsafe_call_dispatch_panic!("aten::div", "Tensor_mode", stack.as_mut_slice());
         let r: Tensor = Tensor::new(stack[0].try_into().unwrap());
         Ok(r)
     }
@@ -1054,6 +1091,45 @@ mod test {
             ]
         ); // #PYTHON list(r.view(-1).tolist())
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_div_mode() -> StableTorchResult<()> {
+        // https://docs.pytorch.org/docs/2.11/generated/torch.div.html#torch.div
+        // Simplifying this example to just two rows, otherwise the amount of numbers gets soo large, but same numbers
+        // from the docs.
+        /*
+            #|PYTHON
+            a = torch.tensor([-0.3711, -1.9353, -0.4605, -0.2917])
+            b = torch.tensor([ 0.8032,  0.2930, -0.8113, -0.2308])
+            a_div_b = torch.div(a, b)
+            a_trunc_b = torch.div(a, b, rounding_mode="trunc")
+            a_floor_b = torch.div(a, b, rounding_mode="floor")
+        */
+
+        let a: Tensor = [-0.3711f32, -1.9353, -0.4605, -0.2917].try_into()?;
+        let b: Tensor = [0.8032f32, 0.2930, -0.8113, -0.2308].try_into()?;
+
+        let a_div_b = a.div_mode(&b, RoundingMode::Default)?;
+        assert_eq!(a_div_b.sizes(), &[4]); // #PYTHON list(a_div_b.shape)
+        assert_eq!(
+            a_div_b.f32s_ref()?,
+            &[
+                -0.4620268940925598f32,
+                -6.605119228363037,
+                0.567607581615448,
+                1.2638648748397827
+            ]
+        ); // #PYTHON list(a_div_b.view(-1).tolist())
+
+        let a_trunc_b = a.div_mode(&b, RoundingMode::Truncate)?;
+        assert_eq!(a_trunc_b.sizes(), &[4]); // #PYTHON list(a_trunc_b.shape)
+        assert_eq!(a_trunc_b.f32s_ref()?, &[-0.0f32, -6.0, 0.0, 1.0]); // #PYTHON list(a_trunc_b.view(-1).tolist())
+
+        let a_floor_b = a.div_mode(&b, RoundingMode::Floor)?;
+        assert_eq!(a_floor_b.sizes(), &[4]); // #PYTHON list(a_floor_b.shape)
+        assert_eq!(a_floor_b.f32s_ref()?, &[-1.0f32, -7.0, 0.0, 1.0]); // #PYTHON list(a_floor_b.view(-1).tolist())
         Ok(())
     }
 

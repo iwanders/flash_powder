@@ -78,6 +78,32 @@ unsafe extern "C" {
     ) -> AOTITorchError;
 }
 
+// https://github.com/pytorch/pytorch/blob/7a247c9f4626c5bac80d45ed3a6e4c6eeba54941/torch/csrc/stable/c/shim.h#L105-L116
+#[repr(C)]
+pub struct StringOpaque {
+    _private: [u8; 0],
+}
+pub type StringOpaqueHandle = *mut StringOpaque;
+
+unsafe extern "C" {
+    pub unsafe fn torch_new_string_handle(
+        data: *const i8,
+        length: usize,
+        ret: *mut StringOpaqueHandle,
+    ) -> AOTITorchError;
+
+    pub unsafe fn torch_delete_string(handle: StringOpaqueHandle) -> AOTITorchError;
+    pub unsafe fn torch_string_length(
+        handle: StringOpaqueHandle,
+        length: *mut usize,
+    ) -> AOTITorchError;
+
+    pub unsafe fn torch_string_c_str(
+        handle: StringOpaqueHandle,
+        data: *mut *const i8,
+    ) -> AOTITorchError;
+}
+
 unsafe extern "C" {
 
     pub unsafe fn torch_exception_get_what() -> *const c_char;

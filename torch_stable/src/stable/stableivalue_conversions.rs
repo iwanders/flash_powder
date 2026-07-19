@@ -107,6 +107,22 @@ impl From<bool> for StableIValue {
     }
 }
 
+// https://github.com/pytorch/pytorch/blob/7a247c9f4626c5bac80d45ed3a6e4c6eeba54941/torch/csrc/stable/stableivalue_conversions.h#L448-L461
+impl From<&str> for StableIValue {
+    fn from(value: &str) -> Self {
+        // Need a zero delimited string, so lets make that.
+        let with_zero = std::ffi::CString::new(value).expect("could not convert string to CString");
+        // Next, we create a new string handle with this data.
+        let mut handle_res: StringOpaqueHandle = std::ptr::null_mut();
+        unsafe_call_panic!(torch_new_string_handle(
+            with_zero.as_ptr(),
+            with_zero.count_bytes(),
+            &mut handle_res
+        ));
+        StableIValue(handle_res as _)
+    }
+}
+
 // THis is all wrong :(
 // https://github.com/pytorch/pytorch/blob/3848e11d554a7f49925b593c40b8be0b86ac6b3f/torch/csrc/stable/stableivalue_conversions.h#L83
 // In combination with
