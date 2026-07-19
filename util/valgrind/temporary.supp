@@ -1,5 +1,6 @@
 {
    # I'm 99% sure this is a memory leak in pytorch, the string is allocated with 'new', the pointer never leaves the scope, but a copy of the value does.
+   # PR filed; https://github.com/pytorch/pytorch/pull/190493
    possible_leak_in_conversion_to_std_string
    Memcheck:Leak
    match-leak-kinds: definite
