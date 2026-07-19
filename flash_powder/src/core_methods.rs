@@ -36,6 +36,22 @@ pub struct MeanOptions {
     pub dtype: Option<DType>,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct TopKOptions {
+    pub dim: isize,
+    pub largest: bool,
+    pub sorted: bool,
+}
+
+impl Default for TopKOptions {
+    fn default() -> Self {
+        Self {
+            dim: -1,
+            largest: true,
+            sorted: true,
+        }
+    }
+}
 /// Core methods that require const access.
 ///
 /// See the [`core_methods`][crate::core_methods] module for description of this trait's functionality.
@@ -451,6 +467,26 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         unsafe_call_dispatch_bail!("aten::greater_equal", "Tensor", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         Ok(Tensor::new(r))
+    }
+
+    /// Topk
+    ///
+    /// Returns the k largest elements of the given input tensor along a given dimension.
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L10012-L10017)
+    /// - [tensor method](https://docs.pytorch.org/docs/2.13/generated/torch.Tensor.topk.html)
+    /// - [pytorch method](https://docs.pytorch.org/docs/2.13/generated/torch.topk.html#torch.topk)
+    fn topk(&self, k: usize, options: &TopKOptions) -> StableTorchResult<(Tensor, Tensor)> {
+        let mut stack: [StableIValue; 5] = [
+            (self.get_tensor()).into(),
+            k.into(),
+            options.dim.into(),
+            options.largest.into(),
+            options.sorted.into(),
+        ];
+        unsafe_call_dispatch_bail!("aten::topk", "", stack.as_mut_slice());
+        let values: StableTensor = stack[0].try_into()?;
+        let indices: StableTensor = stack[1].try_into()?;
+        Ok((Tensor::new(values), Tensor::new(indices)))
     }
 }
 impl CoreMethods for Tensor {}
@@ -1367,6 +1403,39 @@ mod test {
             &[false, false, false, true, true, true, true, true, true]
         ); // #PYTHON c.ravel().tolist()
         assert_eq!(c.sizes(), &[3, 3]); // #PYTHON list(c.shape)
+
+        Ok(())
+    }
+    #[test]
+    fn test_flash_powder_topk() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            x = torch.tensor(list(range(1,6)), dtype=torch.int64)
+            v = x.topk(3)
+        */
+        let d = Tensor::from([1i64, 2, 3, 4, 5])?;
+        let (values, indices) = d.topk(3, &Default::default())?;
+        assert_eq!(values.i64s_ref()?, &[5, 4, 3]); // #PYTHON v.values.ravel().tolist()
+        assert_eq!(values.sizes(), &[3]); // #PYTHON list(v.values.shape)
+        assert_eq!(indices.i64s_ref()?, &[4, 3, 2]); // #PYTHON v.indices.ravel().tolist()
+        assert_eq!(indices.sizes(), &[3]); // #PYTHON list(v.indices.shape)
+
+        /*
+            #|PYTHON
+            x = torch.tensor(list(range(1,6)), dtype=torch.int64)
+            v = x.topk(3, largest=False)
+        */
+        let (values, indices) = d.topk(
+            3,
+            &TopKOptions {
+                largest: false,
+                ..Default::default()
+            },
+        )?;
+        assert_eq!(values.i64s_ref()?, &[1, 2, 3]); // #PYTHON v.values.ravel().tolist()
+        assert_eq!(values.sizes(), &[3]); // #PYTHON list(v.values.shape)
+        assert_eq!(indices.i64s_ref()?, &[0, 1, 2]); // #PYTHON v.indices.ravel().tolist()
+        assert_eq!(indices.sizes(), &[3]); // #PYTHON list(v.indices.shape)
 
         Ok(())
     }
