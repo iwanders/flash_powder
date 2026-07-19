@@ -6,7 +6,7 @@
 //! Come in three flavours:
 //! - `<T>s_ref()`, slice to the entire tensor, example: [`f32s_ref()`][`DataRef::f32s_ref`]
 //! - `<T>_ref(indices: &[usize])`, indexed access to a single scalar, requires [`dim()`][`TensorProperties::dim`]` == indices.len()`, example: [`f32_ref()`][`DataRef::f32_ref`]
-//! - `as_<T>()`, indexing for a 0 dimensional scalar, same as `<T>_ref(&[])`, example: [`as_f32()`][`DataRef::as_f32`]
+//! - `as_<T>()`, indexing for as a scalar, same as `<T>_ref(&[])`, example: [`as_f32()`][`DataRef::as_f32`]
 //!
 //! The access type is checked against the tensor's [`dtype()`][`TensorProperties::dtype`], if you don't want that use [`data()`][`DataRef::data`] and [`data_mut()`][`DataMut::data_mut`].
 use anyhow::bail;
@@ -37,9 +37,9 @@ macro_rules! impl_item_ref {
 }
 macro_rules! impl_as_ref {
     ($t:ty, $v:ident) => {
-        /// Access the tensor as a scalar, requires [`dim()`][`TensorProperties::dim`]` == 0`
+        /// Access the tensor as a scalar, requires [`numel()`][`TensorProperties::numel`]` == 1`
         fn $v(&self) -> StableTorchResult<&$t> {
-            if self.dim() != 0 {
+            if self.numel() != 1 {
                 bail!(
                     "can only use as_<T> with 0 dimensional tensors, dim was {}",
                     self.dim()
@@ -406,6 +406,10 @@ mod test {
         assert_eq!(z.i((1, 0))?.as_f32()?, &5.0); // #PYTHON z[ 1,  0].item()
         assert_eq!(z.i((1, 1))?.as_f32()?, &6.0); // #PYTHON z[ 1,  1].item()
         assert_eq!(z.i((1, 2))?.as_f32()?, &7.0); // #PYTHON z[ 1,  2].item()
+
+        // What about as scalar on a non 0 dim tensor:
+        let scalar_1d: Tensor = [3.3f32].try_into()?;
+        assert_eq!(scalar_1d.as_f32()?, &3.3);
 
         /*
             #|PYTHON
