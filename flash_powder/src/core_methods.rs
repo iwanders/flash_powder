@@ -294,6 +294,19 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         Ok(r)
     }
 
+    /// Modulus operation.
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L9814)
+    /// - [tensor method](https://docs.pytorch.org/docs/2.13/generated/torch.Tensor.remainder.html)
+    /// - [pytorch method](https://docs.pytorch.org/docs/2.13/generated/torch.remainder.html)
+    // Just like GE, this should also support scalars in the future.
+    fn remainder<T: TensorAccess>(&self, other: &T) -> StableTorchResult<Tensor> {
+        let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), other.get_tensor().into()];
+        unsafe_call_dispatch_panic!("aten::remainder", "Tensor", stack.as_mut_slice());
+        let r: Tensor = Tensor::new(stack[0].try_into().unwrap());
+        Ok(r)
+    }
+
     /// Multiply
     ///
     /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L4377)
@@ -1482,6 +1495,7 @@ mod test {
 
         Ok(())
     }
+
     #[test]
     fn test_flash_powder_topk() -> StableTorchResult<()> {
         /*
@@ -1513,6 +1527,31 @@ mod test {
         assert_eq!(indices.i64s_ref()?, &[0, 1, 2]); // #PYTHON v.indices.ravel().tolist()
         assert_eq!(indices.sizes(), &[3]); // #PYTHON list(v.indices.shape)
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_remainder() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            a = torch.remainder(torch.tensor([-3., -2, -1, 1, 2, 3]), 2)
+            b = torch.remainder(torch.tensor([1, 2, 3, 4, 5]), -1.5)
+        */
+        let a_in: Tensor = [-3.0f32, -2.0, -1.0, 1.0, 2.0, 3.0].try_into()?;
+        let a_second: Tensor = 2i64.try_into()?;
+
+        let a = a_in.remainder(&a_second)?;
+
+        assert_eq!(a.f32s_ref()?, &[1.0, -0.0, 1.0, 1.0, 0.0, 1.0]); // #PYTHON a.ravel().tolist()
+        assert_eq!(a.sizes(), &[6]); // #PYTHON list(a.shape)
+
+        let b_in: Tensor = [1i64, 2, 3, 4, 5].try_into()?;
+        let b_second: Tensor = (-1.5f32).try_into()?;
+
+        let b = b_in.remainder(&b_second)?;
+
+        assert_eq!(b.f32s_ref()?, &[-0.5, -1.0, 0.0, -0.5, -1.0]); // #PYTHON b.ravel().tolist()
+        assert_eq!(b.sizes(), &[5]); // #PYTHON list(b.shape)
         Ok(())
     }
 }

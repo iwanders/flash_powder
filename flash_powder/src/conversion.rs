@@ -6,6 +6,8 @@
 //! - `[[T; C]; R]` Creates a 2d tensor.
 //! - `[[[T; C]; R]; D]` Creates a 3d tensor.
 //!
+//! Negative scalar values need parenthesis to ensure it doesn't result in a unary Neg operation.
+//!
 //! ```rust
 //! # use flash_powder::prelude::*;
 //! # use flash_powder::{StableTorchResult, Tensor};
@@ -26,6 +28,8 @@
 //!
 //!   let d: Tensor = [[[1i64, 2], [3, 4]], [[8, 1], [9, 3]]].try_into()?;
 //!   assert_eq!(d.sizes(), &[2, 2, 2]);
+//!
+//!   let negative_float: Tensor = (-1.5f32).try_into()?;
 //! # Ok(())
 //! # }
 //! ```
@@ -160,11 +164,8 @@ impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const V: usiz
     }
 }
 
-impl<
-        T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
-        const C: usize,
-        const R: usize,
-    > TryInto<Tensor> for [[T; C]; R]
+impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const C: usize, const R: usize>
+    TryInto<Tensor> for [[T; C]; R]
 {
     type Error = anyhow::Error;
 
@@ -181,11 +182,8 @@ impl<
     }
 }
 // and its ref;
-impl<
-        T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
-        const C: usize,
-        const R: usize,
-    > TryInto<Tensor> for &[[T; C]; R]
+impl<T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy, const C: usize, const R: usize>
+    TryInto<Tensor> for &[[T; C]; R]
 {
     type Error = anyhow::Error;
 
@@ -203,11 +201,11 @@ impl<
 }
 
 impl<
-        T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
-        const C: usize,
-        const R: usize,
-        const D: usize,
-    > TryInto<Tensor> for [[[T; C]; R]; D]
+    T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
+    const C: usize,
+    const R: usize,
+    const D: usize,
+> TryInto<Tensor> for [[[T; C]; R]; D]
 {
     type Error = anyhow::Error;
 
@@ -225,11 +223,11 @@ impl<
 }
 // and its ref;
 impl<
-        T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
-        const C: usize,
-        const R: usize,
-        const D: usize,
-    > TryInto<Tensor> for &[[[T; C]; R]; D]
+    T: ScalarDType + Immutable + IntoBytes + TryFromBytes + Copy,
+    const C: usize,
+    const R: usize,
+    const D: usize,
+> TryInto<Tensor> for &[[[T; C]; R]; D]
 {
     type Error = anyhow::Error;
 
@@ -249,10 +247,10 @@ impl<
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::StableTorchResult;
     use crate::data::DataRef;
     use crate::dtype::DType;
     use crate::properties::TensorProperties;
-    use crate::StableTorchResult;
 
     #[test]
     fn test_tensor_try_from() -> StableTorchResult<()> {
@@ -322,7 +320,9 @@ mod test {
         assert_eq!(d.sizes(), &[2, 3]); // #PYTHON list(d.shape)
         assert_eq!(
             d.data()?,
-            &[0, 0, 160, 64, 0, 0, 64, 64, 0, 0, 160, 64, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 0, 0]
+            &[
+                0, 0, 160, 64, 0, 0, 64, 64, 0, 0, 160, 64, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 0, 0
+            ]
         ); // #PYTHON d.view(torch.uint8).view(-1).tolist()
         assert_eq!(d.dtype(), DType::F32); // #PYTHON d.dtype
 
@@ -334,7 +334,9 @@ mod test {
         assert_eq!(d.sizes(), &[3, 2]); // #PYTHON list(d.shape)
         assert_eq!(
             d.data()?,
-            &[0, 0, 160, 64, 0, 0, 64, 64, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 128, 63, 0, 0, 0, 64]
+            &[
+                0, 0, 160, 64, 0, 0, 64, 64, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0, 128, 63, 0, 0, 0, 64
+            ]
         ); // #PYTHON d.view(torch.uint8).view(-1).tolist()
         assert_eq!(d.dtype(), DType::F32); // #PYTHON d.dtype
 
@@ -366,7 +368,9 @@ mod test {
         assert_eq!(d.sizes(), &[2, 3]); // #PYTHON list(d.shape)
         assert_eq!(
             d.data()?,
-            &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 51, 51, 83, 64, 0, 0, 176, 64]
+            &[
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 51, 51, 83, 64, 0, 0, 176, 64
+            ]
         ); // #PYTHON d.view(torch.uint8).view(-1).tolist()
         assert_eq!(d.dtype(), DType::F32); // #PYTHON d.dtype
 
