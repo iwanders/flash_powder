@@ -1,0 +1,32 @@
+{
+   # I'm 99% sure this is a memory leak in pytorch, the string is allocated with 'new', the pointer never leaves the scope, but a copy of the value does.
+   possible_leak_in_conversion_to_std_string
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:_Znwm
+   fun:_ZL9to_ivalueRKN3c104Type24SingletonOrSharedTypePtrIS0_EEmm.isra.0
+   fun:_ZL9to_ivalueRKN3c104Type24SingletonOrSharedTypePtrIS0_EEmm.isra.0
+   fun:torch_call_dispatcher
+   fun:_RINvYNtNtCsip7UmJOGdGy_12flash_powder6tensor6TensorNtNtB7_12core_methods11CoreMethods8div_modeB3_EB7_
+   fun:_RNvNtNtCsip7UmJOGdGy_12flash_powder12core_methods4tests_26test_flash_powder_div_mode
+   fun:_RNCNvNtNtCsip7UmJOGdGy_12flash_powder12core_methods4test26test_flash_powder_div_mode0B7_
+   fun:_RNvYNCNvNtNtCsip7UmJOGdGy_12flash_powder12core_methods4test26test_flash_powder_div_mode0INtNtNtCscI6d9CVNmLh_4core3ops8function6FnOnceuE9call_onceBa_
+   fun:call_once<fn() -> core::result::Result<(), alloc::string::String>, ()>
+   fun:_RINvCsa7ftCFLGokL_4test28___rust_begin_short_backtraceINtNtCscI6d9CVNmLh_4core6result6ResultuNtNtCs40k4W9msRzi_5alloc6string6StringEFEBQ_EB2_
+   fun:{closure#0}
+   fun:call_once<core::result::Result<(), alloc::string::String>, test::run_test_in_process::{closure_env#0}>
+   fun:do_call<core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure_env#0}>, core::result::Result<(), alloc::string::String>>
+   fun:catch_unwind<core::result::Result<(), alloc::string::String>, core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure_env#0}>>
+   fun:catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<test::run_test_in_process::{closure_env#0}>, core::result::Result<(), alloc::string::String>>
+   fun:run_test_in_process
+   fun:_RNCNvCsa7ftCFLGokL_4test8run_test0B3_
+   fun:{closure#1}
+   fun:_RINvNtNtCsgczF5crJ4sT_3std3sys9backtrace28___rust_begin_short_backtraceNCNvCsa7ftCFLGokL_4test8run_tests_0uEB1b_
+   fun:{closure#0}<test::run_test::{closure_env#1}, ()>
+   fun:call_once<(), std::thread::lifecycle::spawn_unchecked::{closure#1}::{closure_env#0}<test::run_test::{closure_env#1}, ()>>
+   fun:do_call<core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked::{closure#1}::{closure_env#0}<test::run_test::{closure_env#1}, ()>>, ()>
+   fun:catch_unwind<(), core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked::{closure#1}::{closure_env#0}<test::run_test::{closure_env#1}, ()>>>
+   fun:catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<std::thread::lifecycle::spawn_unchecked::{closure#1}::{closure_env#0}<test::run_test::{closure_env#1}, ()>>, ()>
+   fun:{closure#1}<test::run_test::{closure_env#1}, ()>
+   fun:_RNSNvYNCINvNtNtCsgczF5crJ4sT_3std6thread9lifecycle15spawn_uncheckedNCNvCsa7ftCFLGokL_4test8run_tests_0uEs_0INtNtNtCscI6d9CVNmLh_4core3ops8function6FnOnceuE9call_once6vtableB17_
+}
