@@ -14,6 +14,7 @@ use crate::{StableTorchResult, Tensor, TensorAccess};
 #[derive(Copy, Clone, Debug)]
 pub struct Conv2dOptions {
     pub stride: (i64, i64),
+    /// The first int is used for the height dimension, and the second int for the width dimension
     pub padding: (i64, i64),
     pub dilation: (i64, i64),
     pub groups: i64,
