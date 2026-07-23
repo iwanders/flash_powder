@@ -186,6 +186,26 @@ impl<'a, 'd> SafetensorReader<'a, 'd> {
     }
 }
 
+/// Super thin wrapper around [`memmap2::Mmap`].
+pub struct MappedFile {
+    pub mmap: memmap2::Mmap,
+}
+
+impl MappedFile {
+    pub fn map<Q>(path: Q) -> Result<MappedFile, anyhow::Error>
+    where
+        Q: AsRef<std::path::Path>,
+    {
+        let file = std::fs::File::open(path)?;
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+        Ok(MappedFile { mmap })
+    }
+    pub fn to_safetensors<'a>(&'a self) -> Result<safetensors::SafeTensors<'a>, anyhow::Error> {
+        let tensors = safetensors::SafeTensors::deserialize(&self.mmap)?;
+        Ok(tensors)
+    }
+}
+
 impl<'a, 'd> nn::StateDictAdaptor for SafetensorReader<'a, 'd> {
     fn ten(&self, name: &str) -> Option<Ten<'a>> {
         safetensor_to_ten(self.st, name).ok()
@@ -233,26 +253,6 @@ impl<'a, T: fp::core_methods::CoreMethods + fp::data::DataRef> safetensors::tens
     }
 }
 
-/*
-struct ViewWrapper<'a>(Ten<'a>);
-
-impl<'a> safetensors::tensor::View for ViewWrapper<'a> {
-    fn dtype(&self) -> safetensors::Dtype {
-        flash_powder_dtype_to_safetensor_dtype(TensorProperties::dtype(&self.0))
-    }
-
-    fn shape(&self) -> &[usize] {
-        TensorProperties::sizes(&self.0)
-    }
-
-    fn data(&self) -> std::borrow::Cow<'_, [u8]> {
-        fp::data::DataRef::data(&self.0).unwrap().into()
-    }
-
-    fn data_len(&self) -> usize {
-        fp::data::DataRef::data(&self.0).unwrap().len()
-    }
-}*/
 pub trait StateDictSafetensor {
     fn write_safetensors<Q>(&self, path: Q) -> Result<(), anyhow::Error>
     where
@@ -284,9 +284,8 @@ impl StateDictSafetensor for fp::nn::module::StateDict {
     where
         Q: AsRef<std::path::Path>,
     {
-        let file = std::fs::File::open(path)?;
-        let mmap = unsafe { memmap2::Mmap::map(&file)? };
-        let tensors = safetensors::SafeTensors::deserialize(&mmap)?;
+        let mapped = MappedFile::map(&path)?;
+        let tensors = mapped.to_safetensors()?;
         let our_safetensor = SafetensorReader::from_safetensors(&tensors);
         our_safetensor.to_state_dict(options)
     }

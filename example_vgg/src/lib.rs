@@ -121,9 +121,16 @@ pub fn main() -> Result<(), anyhow::Error> {
     }
 
     // Load safetensors and wrap
-    let data = std::fs::read(weights).expect("Unable to read file");
+    let data = std::fs::read(&weights).expect("Unable to read file");
     let tensors = flash_powder_safetensors::safetensors::SafeTensors::deserialize(&data)?;
     let reader = flash_powder_safetensors::SafetensorReader::from_safetensors(&tensors);
+
+    // Or by memory mapping  the file:
+    /*
+    let mapped_file = flash_powder_safetensors::MappedFile::map(weights)?;
+    let tensors = mapped_file.to_safetensors()?;
+    let reader = flash_powder_safetensors::SafetensorReader::from_safetensors(&tensors);
+    */
 
     // Instantiate vgg network and load its weights.
     let features = make_layers(CFG_A)?;
