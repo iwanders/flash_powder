@@ -26,9 +26,13 @@ anyhow = "1.0.102"
 zerocopy = "0.8.48"
 tinyvec = "1.11.0"
 
+
 # Very broad version, such that the consumer can pick it if they want to.
 safetensors = "0.8"
 image = {version="0.25" , default-features=false}
+
+# Also allowed by rustc; https://github.com/rust-lang/rust/blob/1.97.1/src/tools/tidy/src/deps.rs#L367
+memmap2 = "0.9"
 
 
 [workspace.lints.clippy]

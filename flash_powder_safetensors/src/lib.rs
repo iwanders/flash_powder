@@ -41,6 +41,10 @@ use flash_powder::prelude::*;
 pub use safetensors;
 use safetensors::SafeTensors;
 
+pub mod prelude {
+    pub use super::StateDictSafetensor;
+}
+
 /// Convert [`safetensors::Dtype`] to [`fp::DType`].
 pub fn safetensor_dtype_to_flash_powder_dtype(v: safetensors::Dtype) -> fp::DType {
     match v {
@@ -166,6 +170,20 @@ impl<'a, 'd> SafetensorReader<'a, 'd> {
     pub fn from_safetensors(st: &'a SafeTensors<'d>) -> Self {
         Self { st }
     }
+
+    pub fn to_state_dict(
+        &self,
+        options: &flash_powder::factory::ToOptions,
+    ) -> Result<nn::StateDict, anyhow::Error> {
+        let mut d = nn::StateDict::default();
+        for k in self.keys() {
+            let ten_view = self
+                .ten(&k)
+                .ok_or(anyhow::anyhow!("failed to find tensor {k}"))?;
+            d.add_data(&k, nn::Data::Buffer(ten_view.to(options)?))?;
+        }
+        Ok(d)
+    }
 }
 
 impl<'a, 'd> nn::StateDictAdaptor for SafetensorReader<'a, 'd> {
@@ -215,6 +233,65 @@ impl<'a, T: fp::core_methods::CoreMethods + fp::data::DataRef> safetensors::tens
     }
 }
 
+/*
+struct ViewWrapper<'a>(Ten<'a>);
+
+impl<'a> safetensors::tensor::View for ViewWrapper<'a> {
+    fn dtype(&self) -> safetensors::Dtype {
+        flash_powder_dtype_to_safetensor_dtype(TensorProperties::dtype(&self.0))
+    }
+
+    fn shape(&self) -> &[usize] {
+        TensorProperties::sizes(&self.0)
+    }
+
+    fn data(&self) -> std::borrow::Cow<'_, [u8]> {
+        fp::data::DataRef::data(&self.0).unwrap().into()
+    }
+
+    fn data_len(&self) -> usize {
+        fp::data::DataRef::data(&self.0).unwrap().len()
+    }
+}*/
+pub trait StateDictSafetensor {
+    fn write_safetensors<Q>(&self, path: Q) -> Result<(), anyhow::Error>
+    where
+        Q: AsRef<std::path::Path>;
+
+    fn read_safetensors<Q>(
+        path: Q,
+        options: &fp::factory::ToOptions,
+    ) -> Result<fp::nn::StateDict, anyhow::Error>
+    where
+        Q: AsRef<std::path::Path>;
+}
+impl StateDictSafetensor for fp::nn::module::StateDict {
+    fn write_safetensors<Q>(&self, path: Q) -> Result<(), anyhow::Error>
+    where
+        Q: AsRef<std::path::Path>,
+    {
+        let mut data = vec![];
+        for (k, v) in self.as_map().iter() {
+            data.push((k, SafetensorView::new(v.as_tensor()?)?));
+        }
+        let p: &std::path::Path = path.as_ref();
+        safetensors::tensor::serialize_to_file(data, None, p).map_err(|a| a.into())
+    }
+    fn read_safetensors<Q>(
+        path: Q,
+        options: &fp::factory::ToOptions,
+    ) -> Result<fp::nn::StateDict, anyhow::Error>
+    where
+        Q: AsRef<std::path::Path>,
+    {
+        let file = std::fs::File::open(path)?;
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+        let tensors = safetensors::SafeTensors::deserialize(&mmap)?;
+        let our_safetensor = SafetensorReader::from_safetensors(&tensors);
+        our_safetensor.to_state_dict(options)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -260,6 +337,7 @@ mod test {
 
         Ok(())
     }
+
     #[test]
     fn test_minimal() -> Result<(), anyhow::Error> {
         // We create some dummy safetensor data here:
@@ -276,10 +354,25 @@ mod test {
         // Read into its tensors.
         let options = fp::nn::StateDictLoadOptions::default();
         new_linear.load_state_dict(&reader, &options)?;
+        assert!(new_linear.weight.is_equal(&fp::Tensor::from([[3.3f32]])?)?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_statedict() -> Result<(), anyhow::Error> {
+        let weight = fp::Tensor::from([[3.3f32]])?;
+        let mut d = fp::nn::StateDict::default();
+        d.add_data("weight", nn::Data::Parameter(weight))?;
+        let path = "/tmp/statedict.safetensor";
+        d.write_safetensors(path)?;
+
+        let back = flash_powder::nn::StateDict::read_safetensors(path, &Default::default())?;
+
         assert!(
-            new_linear
-                .weight
-                .is_equal(&fp::Tensor::from([[3.3f32]])?)?
+            d.as_map()["weight"]
+                .as_tensor()?
+                .is_equal(back.as_map()["weight"].as_tensor()?)?
         );
 
         Ok(())

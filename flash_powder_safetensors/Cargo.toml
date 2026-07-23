@@ -10,6 +10,7 @@ license = "BSD-3-Clause"
 [dependencies]
 anyhow = {workspace=true}
 safetensors = {workspace=true}
+memmap2 = {workspace=true}
 flash_powder  = {workspace=true, features=[ ]}
 
 [build-dependencies]
