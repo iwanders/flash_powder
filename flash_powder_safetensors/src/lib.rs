@@ -254,6 +254,12 @@ impl<'a, T: fp::core_methods::CoreMethods + fp::data::DataRef> safetensors::tens
 }
 
 pub trait StateDictSafetensor {
+    fn serialize_safetensors(&self) -> Result<Vec<u8>, anyhow::Error>;
+    fn deserialize_safetensors(
+        data: &[u8],
+        options: &fp::factory::ToOptions,
+    ) -> Result<fp::nn::StateDict, anyhow::Error>;
+
     fn write_safetensors<Q>(&self, path: Q) -> Result<(), anyhow::Error>
     where
         Q: AsRef<std::path::Path>;
@@ -286,6 +292,23 @@ impl StateDictSafetensor for fp::nn::module::StateDict {
     {
         let mapped = MappedFile::map(&path)?;
         let tensors = mapped.to_safetensors()?;
+        let our_safetensor = SafetensorReader::from_safetensors(&tensors);
+        our_safetensor.to_state_dict(options)
+    }
+
+    fn serialize_safetensors(&self) -> Result<Vec<u8>, anyhow::Error> {
+        let mut data = vec![];
+        for (k, v) in self.as_map().iter() {
+            data.push((k, SafetensorView::new(v.as_tensor()?)?));
+        }
+        safetensors::tensor::serialize(data, None).map_err(|a| a.into())
+    }
+
+    fn deserialize_safetensors(
+        data: &[u8],
+        options: &fp::factory::ToOptions,
+    ) -> Result<fp::nn::StateDict, anyhow::Error> {
+        let tensors = safetensors::SafeTensors::deserialize(data)?;
         let our_safetensor = SafetensorReader::from_safetensors(&tensors);
         our_safetensor.to_state_dict(options)
     }
@@ -366,10 +389,23 @@ mod test {
         let path = "/tmp/statedict.safetensor";
         d.write_safetensors(path)?;
 
+        let v = std::fs::read(path)?;
+        let serialized = d.serialize_safetensors()?;
+        assert_eq!(&v, &serialized);
+
         let back = flash_powder::nn::StateDict::read_safetensors(path, &Default::default())?;
+
+        let deserialized =
+            flash_powder::nn::StateDict::deserialize_safetensors(&serialized, &Default::default())?;
 
         assert!(
             d.as_map()["weight"]
+                .as_tensor()?
+                .is_equal(back.as_map()["weight"].as_tensor()?)?
+        );
+
+        assert!(
+            deserialized.as_map()["weight"]
                 .as_tensor()?
                 .is_equal(back.as_map()["weight"].as_tensor()?)?
         );
