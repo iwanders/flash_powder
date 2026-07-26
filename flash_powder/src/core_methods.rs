@@ -533,8 +533,12 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     // }
 
     // - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L8879-L8885)
-    gen_compare_method!(ge, "aten::ge", "Greater or Equal to");
     gen_compare_method!(ne, "aten::ne", "Not Equal to");
+    gen_compare_method!(eq, "aten::eq", "EQual to");
+    gen_compare_method!(ge, "aten::ge", "Greater or Equal to");
+    gen_compare_method!(gt, "aten::gt", "Greater Than");
+    gen_compare_method!(le, "aten::le", "Less or Equal to");
+    gen_compare_method!(lt, "aten::lt", "Less Than");
 
     /// Topk
     ///
@@ -1533,18 +1537,43 @@ mod test {
     }
 
     #[test]
-    fn test_flash_powder_ne_tensor() -> StableTorchResult<()> {
+    fn test_flash_powder_comparisons_ne_eq_lt_gt_ge_le_tensor_out() -> StableTorchResult<()> {
         /*
             #|PYTHON
             a = torch.tensor([[1, 2], [3, 4]])
             b = torch.tensor([[1, 1], [4, 4]])
-            c = a.ne(b)
+            ne = a.ne(b)
+            eq = a.eq(b)
+            lt = a.lt(b)
+            gt = a.gt(b)
+            ge = a.ge(b)
+            le = a.le(b)
         */
         let a: Tensor = [[1, 2], [3, 4]].try_into()?;
         let b: Tensor = [[1, 1], [4, 4]].try_into()?;
-        let c = a.ne(&b)?;
-        assert_eq!(c.bools_ref()?, &[false, true, true, false]); // #PYTHON c.ravel().tolist()
-        assert_eq!(c.sizes(), &[2, 2]); // #PYTHON list(c.shape)
+        let ne = a.ne(&b)?;
+        assert_eq!(ne.bools_ref()?, &[false, true, true, false]); // #PYTHON ne.ravel().tolist()
+        assert_eq!(ne.sizes(), &[2, 2]); // #PYTHON list(ne.shape)
+
+        let eq = a.eq(&b)?;
+        assert_eq!(eq.bools_ref()?, &[true, false, false, true]); // #PYTHON eq.ravel().tolist()
+        assert_eq!(eq.sizes(), &[2, 2]); // #PYTHON list(eq.shape)
+
+        let lt = a.lt(&b)?;
+        assert_eq!(lt.bools_ref()?, &[false, false, true, false]); // #PYTHON lt.ravel().tolist()
+        assert_eq!(lt.sizes(), &[2, 2]); // #PYTHON list(lt.shape)
+
+        let gt = a.gt(&b)?;
+        assert_eq!(gt.bools_ref()?, &[false, true, false, false]); // #PYTHON gt.ravel().tolist()
+        assert_eq!(gt.sizes(), &[2, 2]); // #PYTHON list(gt.shape)
+
+        let ge = a.ge(&b)?;
+        assert_eq!(ge.bools_ref()?, &[true, true, false, true]); // #PYTHON ge.ravel().tolist()
+        assert_eq!(ge.sizes(), &[2, 2]); // #PYTHON list(ge.shape)
+
+        let le = a.le(&b)?;
+        assert_eq!(le.bools_ref()?, &[true, false, true, true]); // #PYTHON le.ravel().tolist()
+        assert_eq!(le.sizes(), &[2, 2]); // #PYTHON list(le.shape)
 
         Ok(())
     }
