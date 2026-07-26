@@ -65,6 +65,11 @@ extern "C" fn my_init_function() {
         schema.as_ptr(),
     ));
 
+    let schema = c"simple_takes_tensor(Tensor a) -> ()";
+    unsafe_call_panic!(aoti_torch_library_def(
+        LIBRARY_HANDLE.get().unwrap().0,
+        schema.as_ptr(),
+    ));
     // Next, we need to actually provide the implementation for it.
     /*
     STABLE_TORCH_LIBRARY_IMPL(extension_cpp, CPU, m) {
@@ -88,6 +93,29 @@ extern "C" fn my_init_function() {
         name.as_ptr(),
         fun_simple,
     ));
+
+    let name = c"simple_takes_tensor";
+    extern "C" fn simple_takes_tensor(stack: *mut StableIValue, num_input: u64, num_outputs: u64) {
+        println!("Invoking the fun_simple inputs:  {num_input:?} outputs: {num_outputs:?} ");
+        let a_ivalue = unsafe { *stack.offset(0) };
+        let a_stable_tensor: torch_stable::stable::tensor::Tensor = a_ivalue.try_into().unwrap();
+        let a_fp_tensor: Tensor = Tensor::new(a_stable_tensor);
+        println!("input tensor: {a_fp_tensor:?}");
+        // Leak the tensor we wrapped, since we don't actually own it...
+        unsafe {
+            a_fp_tensor
+                .into_stable_tensor()
+                .into_inner()
+                .map(|a| a.into_raw());
+        }
+        unsafe { *stack.offset(0) = StableIValue(0) };
+    }
+    unsafe_call_panic!(aoti_torch_library_impl(
+        LIBRARY_HANDLE.get().unwrap().0,
+        name.as_ptr(),
+        simple_takes_tensor,
+    ));
+
     //
     let name = c"mymuladd";
 

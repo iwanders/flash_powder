@@ -19,6 +19,9 @@ else:
 
      
     r = torch.ops.extension_cpp.simple()
+    a = torch.randn((2,2))
+    r = torch.ops.extension_cpp.simple_takes_tensor( a)
+    print(a)
 
 
     if False:
