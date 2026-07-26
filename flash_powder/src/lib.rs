@@ -11,7 +11,7 @@
 //! - [`data`]`::{`[`DataRef`][`data::DataRef`], [`DataMut`][`data::DataMut`]`}`: Traits to access the tensor's data as bytes or other types.
 //! - [`core_methods`]`::`[`CoreMethods`][`core_methods::CoreMethods`]: Methods / Functions on [`TensorAccess`] that require const access.
 //! - [`core_methods`]`::`[`CoreMethodsMut`][`core_methods::CoreMethodsMut`]: Methods / Functions on [`TensorAccess`] that require mutable access.
-//! - [`functional`]: Holds free functions line [`conv2d`][`functional::conv2d`] and [`relu`][`functional::relu`], just like PyTorch's Functional.
+//!
 //!
 //! Other principles;
 //! - No unsafe in the public interface, safe behaviour as you'd expect.
@@ -21,7 +21,8 @@
 //!
 //! The [`nn`] module provides pure-Rust implementations for some of Pytorch's nn submodule;
 //! - [`nn::Module`]: Main trait for a neural network layer.
-//! - [`nn::layer`]: Implemented layers, these are nothing more than structs owning weights and calling into the appropriate [`functional`].
+//! - [`nn::layer`]: Implemented layers, these are nothing more than structs owning weights and calling into the appropriate [`nn::functional`].
+//! - [`nn::functional`]: Holds free functions line [`conv2d`][`nn::functional::conv2d`] and [`relu`][`nn::functional::relu`], just like PyTorch's Functional.
 //!
 
 /*

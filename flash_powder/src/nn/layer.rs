@@ -1,6 +1,6 @@
 //! Layers implementing [`Module`].
 //!
-//! These are prety much structs that wrap functions in [`crate::functional`] but also own the tensor weights.
+//! These are prety much structs that wrap functions in [`super::functional`] but also own the tensor weights.
 use super::functional;
 use super::module::{Module, ModuleTensors, ModuleTensorsMut};
 use crate::factory::TensorOptions;

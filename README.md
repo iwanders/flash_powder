@@ -101,7 +101,7 @@ let z = d.i((-3isize..3, -3isize..3))?; // z = d[-3:3, -3:3]
 assert_eq!(z.sizes(), &[2, 2]); // #PYTHON list(z.shape)
 ```
 
-The [functional](flash_powder/src/functional.rs) module provides the basic building blocks I needed for vgg & U-net;
+The [functional](flash_powder/src/nn/functional.rs) module provides the basic building blocks I needed for vgg & U-net;
 `adaptive_avg_pool2d`, `conv2d`, `conv_transpose2d`, `interpolate`, `linear`, `max_pool2d`, `relu` and `upsample`.
 This is definitely not fully featured, but shows how to dispatch kernels, they are defined in [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml), which comes with a [README](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/README.md) that explains the flags (permalinks to v2.12, be sure to change that to latest).
 Kernel dispatches can of course be done out-of-crate.

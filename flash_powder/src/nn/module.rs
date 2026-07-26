@@ -375,7 +375,7 @@ pub struct StateDictLoadOptions {
 
     /// Populate optional tensors if not yet populated in the destination and present in the state dictionary.
     ///
-    /// This always assigns, regardless of the [`assign`] field.
+    /// This always assigns, regardless of the [`StateDictLoadOptions::assign`] field.
     ///
     /// This has no equivalent on the python side.
     pub populate_optional: bool,
