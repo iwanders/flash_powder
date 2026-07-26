@@ -1,0 +1,17 @@
+[package]
+name = "example_pytorch_extension"
+version = "0.1.0"
+edition = "2024"
+license = "BSD-3-Clause"
+
+[lib]
+crate-type=["cdylib"]
+
+[dependencies]
+flash_powder = {workspace=true, features=["cuda" ]}
+
+[build-dependencies]
+flash_powder = {workspace=true, features=["cuda" ]}
+
+[lints]
+workspace = true

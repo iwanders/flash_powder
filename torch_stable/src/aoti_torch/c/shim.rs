@@ -8,6 +8,14 @@ pub struct StreamOpaque {
 }
 pub type StreamHandle = *mut StreamOpaque;
 
+// https://github.com/pytorch/pytorch/blob/v2.13.0/torch/csrc/inductor/aoti_torch/c/shim.h#L493
+#[repr(C)]
+pub struct TorchLibraryOpaque {
+    _private: [u8; 0],
+}
+pub type TorchLibraryHandle = *mut TorchLibraryOpaque;
+pub type AotiTorchLibraryImpl = extern "C" fn(*mut StableIValue /* data */, u64, u64);
+
 // Keep the order the same as the original file.
 unsafe extern "C" {
 
@@ -225,6 +233,36 @@ unsafe extern "C" {
 
     // https://github.com/pytorch/pytorch/blob/v2.11.0/torch/csrc/inductor/aoti_torch/c/shim.h#L422C1-L423C74
     pub unsafe fn aoti_torch_zero_(_self: AtenTensorHandle) -> AOTITorchError;
+
+    // https://github.com/pytorch/pytorch/blob/v2.13.0/torch/csrc/inductor/aoti_torch/c/shim.h#L493
+    // https://github.com/pytorch/pytorch/blob/v2.13.0/torch/csrc/inductor/aoti_torch/c/shim.h#L507
+    pub unsafe fn aoti_torch_library_init_def(
+        ns: *const std::ffi::c_char,
+        file: *const std::ffi::c_char,
+        line: u32,
+        ret_new_torch_lib: &mut TorchLibraryHandle,
+    ) -> AOTITorchError;
+    pub unsafe fn aoti_torch_library_init_impl(
+        ns: *const std::ffi::c_char,
+        k: *const std::ffi::c_char,
+        file: *const std::ffi::c_char,
+        line: u32,
+        ret_new_torch_lib: &mut TorchLibraryHandle,
+    ) -> AOTITorchError;
+
+    pub unsafe fn aoti_torch_library_impl(
+        tlh: TorchLibraryHandle,
+        name: *const std::ffi::c_char,
+        fun: AotiTorchLibraryImpl,
+        //  void (*fn)(StableIValue*, uint64_t, uint64_t));
+    ) -> AOTITorchError;
+
+    pub unsafe fn aoti_torch_library_def(
+        this: TorchLibraryHandle,
+        schema: *const std::ffi::c_char,
+    ) -> AOTITorchError;
+
+    pub unsafe fn aoti_torch_delete_library_object(tlh: TorchLibraryHandle) -> AOTITorchError;
 
     // https://github.com/pytorch/pytorch/blob/3a6383d72a4fdfeaa0eb7740c6b651ca4fb2349b/torch/csrc/inductor/aoti_torch/c/shim.h#L566
     /// UNTESTED

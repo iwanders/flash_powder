@@ -6,7 +6,8 @@ members = [
     "flash_powder",
     "flash_powder_safetensors",
     "flash_powder_image",
-    "example_vgg"
+    "example_vgg",
+    "example_pytorch_extension"
 ]
 
 
@@ -17,6 +18,7 @@ flash_powder = { version = "0.1.0", path = "./flash_powder/"}
 flash_powder_safetensors = { version = "0.1.0", path = "./flash_powder_safetensors/"}
 flash_powder_image = { version = "0.1.0", path = "./flash_powder_image/"}
 example_vgg = { version = "0.1.0", path = "./example_vgg/"}
+example_pytorch_extension = { version = "0.1.0", path = "./example_pytorch_extension/"}
 
 
 cc = "1.0"

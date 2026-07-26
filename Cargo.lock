@@ -271,6 +271,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "example_pytorch_extension"
+version = "0.1.0"
+dependencies = [
+ "flash_powder",
+]
+
+[[package]]
 name = "example_vgg"
 version = "0.1.0"
 dependencies = [
