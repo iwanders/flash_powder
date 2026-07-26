@@ -64,6 +64,19 @@ pub enum RoundingMode {
     Floor,
 }
 
+macro_rules! gen_compare_method {
+    ($name:ident, $kernel_name:literal, $fancy_name:literal) => {
+        #[doc = concat!( $fancy_name, "\n\nComparison with the ", stringify!($kernel_name), " kernel using self and other.")]
+        fn $name<T: TensorAccess>(&self, other: &T) -> StableTorchResult<Tensor> {
+            let mut stack: [StableIValue; 2] =
+                [(self.get_tensor()).into(), other.get_tensor().into()];
+            unsafe_call_dispatch_bail!($kernel_name, "Tensor", stack.as_mut_slice());
+            let r: StableTensor = stack[0].try_into()?;
+            Ok(Tensor::new(r))
+        }
+    };
+}
+
 /// Core methods that require const access.
 ///
 /// See the [`core_methods`][crate::core_methods] module for description of this trait's functionality.
@@ -506,18 +519,22 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         Ok(Tensor::new(r))
     }
 
-    /// Greater or Equal then
-    ///
-    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L8905)
+    // Greater or Equal then
+    //
+    // - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L8879-L8885)
     // This function has like 5 overloads, the most important are Scalar and Tensor, for now we require TensorAccess
     // in the future, after Scalar is created, we can drop that req in Favour of a ScalarOrTensor trait, which would
     // allow us to handle both with the same function, and also support casting native types to Scalar.
-    fn ge<T: TensorAccess>(&self, other: &T) -> StableTorchResult<Tensor> {
-        let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), other.get_tensor().into()];
-        unsafe_call_dispatch_bail!("aten::greater_equal", "Tensor", stack.as_mut_slice());
-        let r: StableTensor = stack[0].try_into()?;
-        Ok(Tensor::new(r))
-    }
+    // fn ge<T: TensorAccess>(&self, other: &T) -> StableTorchResult<Tensor> {
+    //     let mut stack: [StableIValue; 2] = [(self.get_tensor()).into(), other.get_tensor().into()];
+    //     unsafe_call_dispatch_bail!("aten::ge", "Tensor", stack.as_mut_slice());
+    //     let r: StableTensor = stack[0].try_into()?;
+    //     Ok(Tensor::new(r))
+    // }
+
+    // - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L8879-L8885)
+    gen_compare_method!(ge, "aten::ge", "Greater or Equal to");
+    gen_compare_method!(ne, "aten::ne", "Not Equal to");
 
     /// Topk
     ///
@@ -1511,6 +1528,23 @@ mod test {
             &[false, false, false, true, true, true, true, true, true]
         ); // #PYTHON c.ravel().tolist()
         assert_eq!(c.sizes(), &[3, 3]); // #PYTHON list(c.shape)
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_ne_tensor() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            a = torch.tensor([[1, 2], [3, 4]])
+            b = torch.tensor([[1, 1], [4, 4]])
+            c = a.ne(b)
+        */
+        let a: Tensor = [[1, 2], [3, 4]].try_into()?;
+        let b: Tensor = [[1, 1], [4, 4]].try_into()?;
+        let c = a.ne(&b)?;
+        assert_eq!(c.bools_ref()?, &[false, true, true, false]); // #PYTHON c.ravel().tolist()
+        assert_eq!(c.sizes(), &[2, 2]); // #PYTHON list(c.shape)
 
         Ok(())
     }
