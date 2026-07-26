@@ -9,7 +9,7 @@ This is mostly my project to gain a better understanding of how (lib/py)torch wo
 The stable ABI doesn't expose all functionality of libtorch, but a surprising amount of functionality is available,
 especially if the goal is just to do inference. The [example_vgg](./example_vgg) crate holds an implementation of vgg11.
 
-This was developed for doing inference with an U-Net in my [overlay_segmenter](https://github.com/iwanders/overlay_segmenter/).
+This was developed for doing postprocessing and inference with an U-Net in my [overlay_segmenter](https://github.com/iwanders/overlay_segmenter/).
 
 ### Approach
 
@@ -17,8 +17,8 @@ It follows the rust semantics as closely as possible. This means;
 
 - No unsafe in the public interface, safe behaviour as you'd expect.
 - No interior mutability, all methods are const correct.
-- Modifying one tensor will not modify another, unless it has a mutable borrow.
-- Rust style lifetimes on tensors, either tied together with an explicit lifetime, or completely separate.
+- Modifying one tensor will not modify another, unless it has a mutable borrow on the other.
+- Rust style lifetimes on tensors, either tied together with an explicit lifetime, or owning.
 
 There are three structures fundamental to achieving this:
 
@@ -40,6 +40,8 @@ All functions or methods that can fail return a `Result`, which when it fails ho
 
 Creating a tensor can be done with the [conversion](flash_powder/src/conversion.rs) module through `TryInto<Tensor>`:
 ```rust
+use flash_powder as fp;
+use flash_powder::Tensor;
 // Convert a scalar like so:
 let d: Tensor = 5i64.try_into()?;
 assert_eq!(d.dim(), 0);
@@ -125,19 +127,61 @@ The functionality in this crate is a subset of the upstream functionality, it do
 
 Helper utilities for working with [safetensors](https://huggingface.co/docs/safetensors/index) are available in the [flash_powder_safetensors](./flash_powder_safetensors) crate.
 
+Loading a safetensors file into a `nn::Module`, from the `example_vgg` code:
+```rust
+// Load safetensors data from disk, deserialize it and wrap it in a reader.
+let data = std::fs::read(&weights).expect("Unable to read file");
+let tensors = flash_powder_safetensors::safetensors::SafeTensors::deserialize(&data)?;
+let reader = flash_powder_safetensors::SafetensorReader::from_safetensors(&tensors);
+
+// Or by memory mapping the file instead of reading to memory, this allows directly moving tensors from disk to gpu.
+let mapped_file = flash_powder_safetensors::MappedFile::map(weights)?; // Very thin wrapper around mmap2.
+let tensors = mapped_file.to_safetensors()?;
+let reader = flash_powder_safetensors::SafetensorReader::from_safetensors(&tensors);
+
+// And load it into the module.
+vgg.load_state_dict(&reader, &Default::default())?;
+```
+
+It also provides helpers to serialize/deserialize and reader/write to and from an `fp::nn::module::StateDict`.
+
+
 ### flash_powder_image
 
 Helper utilities for working with the Rust [image](https://docs.rs/image/latest/image/) crate available in the [flash_powder_image](./flash_powder_image) crate.
 
 The most useful functionality of this crate is that it facilitates reading and writing images directly to and from Tensors:
 ```rust
+use flash_powder_image::prelude::*;
+// Read an image from disk;
 let img = Tensor::read_image("super_cool_image.png")?; // [C, H, W], DType::U8, [0, 255]
+
+// Save an image with: 
 img.save_image("/tmp/it_was_really_cool.png")?;  // Expects [C, H, W], DType::U8 in [0, 255], or float in [0, 1.0].
+
 ```
 
 It also handles `[B, C, H, W]`, which creates a row of images, and `[V, B, C, H, W]` to vertically stack batched image rows.
 
+Additional functionality is provided that's commonly used when handling images:
 
+```rust
+// You can floatify an image to scale it from integer [0,255] to F32 [0.0, 1.0], you can pass a DType to the ToOptions struct
+// to immediately select another data data and/or device.
+let img = Tensor::read_image(&path)?.image_floatify(&ToOptions::default())?;
+
+// It can also scale a tensor to be within the [0.0, 1.0] domain for easy visualisation:
+combined.image_scale_to_domain()?.save_image("/tmp/visible_tensor.png")?;
+
+// Or through an image::ImageReader:
+let img = image::ImageReader::open("/tmp/fp_rgba_f32.png")?.decode()?;
+let img_as_tensor = img.to_tensor()?;
+// And back
+let dynamic_image = img_as_tensor.to_dynamic_image()?;
+
+// And image resize using tensors, using LibTorch's interpolate method.
+let d_larger = img_as_tensor.image_resize([100, 100], functional::InterpolateAlgorithm::Nearest)?;
+```
 
 ## Usage
 
@@ -147,11 +191,13 @@ cargo add --git https://github.com/iwanders/flash_powder.git flash_powder  -F cu
 cargo add --git https://github.com/iwanders/flash_powder.git flash_powder  -F cuda --build
 ```
 
-Update with
+Update manually with
 ```
 cargo update
 ```
 
+
+### v2.13
 The minimum PyTorch/libTorch version is 2.13, which was the version under development when I reached out about this ffi
 use case with [this comment](https://github.com/pytorch/pytorch/issues/174507#issuecomment-4150977835), 
 a followup [issue](https://github.com/pytorch/pytorch/issues/179427) around lack of error retrieval functionality was created.
@@ -159,6 +205,33 @@ The proposed changes were incorporated [in this PR](https://github.com/pytorch/p
 The lack of allocator/deleter for `StableIValue` was addressed [in this PR](https://github.com/pytorch/pytorch/pull/179421).
 The `v2_13` feature was removed in [`fdb282`](https://github.com/iwanders/flash_powder/commit/fdb282381e3fd7458008a69fa04208dfcfad688d), the stable ivalue creation workaround in [`60b505fd1`](https://github.com/iwanders/flash_powder/commit/60b505fd17c5b3ab1f45f6b2bfe3aa85cc4d2d1f), with these reinstated it could run on older versions.
 
+### v2.14
+Prior to v2.14, there's a tiny memory leak in the conversion between StableIValue's to String, fixed in [this PR](https://github.com/pytorch/pytorch/pull/190493).
+This does mean that kernels that take a string argument will leak their value.
+At the time of writing that is only a concern for the `div.Tensor_mode` kernel, which is used by the `div_mode` method to do integer division.
+
+## Discussion
+
+Mostly jotting these down for myself, but this may be relevant for anyone coming across this:
+
+PyTorch heavily uses overloading, for example [squeeze](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L5847-L5880) has the default, `dim`, `dimname` and `dims` overloads.
+And [mean](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L4041-L4079) has six of them. Currently, this is handled a bit ad-hoc.
+Maybe this should have a stricter convention...
+
+In a lot of places I used `usize`, while LibTorch uses `i64`, in PyTorch you can often use negative indices.
+An example where I introduced an 'overload' is `TensorProperties::size(&self, dim: usize)` and its signed `TensorProperties::isize(&self, dim: isize)` counterpart.
+This is all a bit tricky, because using usize is nice as you can pass lengths from rust directly, but losing the negative values is problematic.
+What we could do instead is introduce a `Dimension` trait that accepts any integer and handles it appropriately?
+
+On indexing, we currently have `.i` and `.i_mut` to return `Ten` and `TenMut` respectively, but `index.Tensor` returns a copy, which doesn't fit into that architecture, so we can't index with tensors right now through the nice interface and you manually have to call `CoreMethods::index_tensor`.
+
+Not all kernels can be dispatched at the moment, `Scalar` support is missing, see the comment and thread [here](https://github.com/pytorch/pytorch/issues/174507#issuecomment-4927379646).
+This is most notably a problem with [add.Tensor](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L555), which is currently worked around with by calling into [_foreach_addcmul.Tensor](https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L11241) instead, which conveniently takes `scalars` as a `Tensor`, subtraction is made with the same kernel.
+This feels pretty fragile, and is probably less performant than a normal addition, once `Scalar` support lands this can be cleaned up.
+Once that lands, a lot of methods should probably be changed to take either a Tensor or a Scalar, such that dividing by a single number doesn't require creating a scalar tensor first.
+
+Sometimes chains of borrows are problematic, like `let nonzero = counts.eq(&zero)?.squeeze()?` will result in a lifetime error as `squeeze` borrows, but the result of `counts.eq` goes out of scope, work around this by separating the statement or making it owning with `.to_owned()?;`.
+Should see if this can be made better.
 
 ## Testing
 
