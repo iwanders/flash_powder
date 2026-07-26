@@ -17,15 +17,22 @@ use crate::{StableTorchResult, unsafe_call_bail, unsafe_call_panic};
 pub struct TensorDropper(pub AtenTensorHandle);
 impl Drop for TensorDropper {
     fn drop(&mut self) {
-        // println!("dropping 0x{:x?}", self.0);
-        // We can't do anything with the return value here, so we quietly ignore it :/
+        // println!(
+        //     "dropping 0x{:x?} with self at 0x{:x?}",
+        //     self.0, self as *const _
+        // );
+        // panic!();
+        // We can't do anything useful with the return value here, so we just panic if anything goes wrong.
+        // If this happens, something unsound has happened, so we ought to panic (and fix it).
         unsafe_call_panic!(aoti_torch_delete_tensor_object(self.0));
     }
 }
 impl TensorDropper {
     ///  Convert the dropper into the handle, avoiding the delete.
     pub fn into_raw(self) -> AtenTensorHandle {
-        self.0
+        let TensorDropper(c) = self;
+        std::mem::forget(self); // what sorcery is this? Why is this necessary!?
+        c
     }
 }
 // This should be safe I think? The handle should be fully safe to move around between threads and also for concurrent

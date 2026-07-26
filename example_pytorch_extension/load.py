@@ -20,8 +20,10 @@ else:
      
     r = torch.ops.extension_cpp.simple()
     a = torch.randn((2,2))
-    r = torch.ops.extension_cpp.simple_takes_tensor( a)
-    print(a)
+    # r = torch.ops.extension_cpp.simple_takes_tensor( a)
+    print(a) # Up to here is good.
+    r = torch.ops.extension_cpp.simple_returns_tensor()
+    print(r) # Good now!
 
 
     if False:
