@@ -20,7 +20,7 @@ else:
      
     r = torch.ops.extension_cpp.simple()
     a = torch.randn((2,2))
-    # r = torch.ops.extension_cpp.simple_takes_tensor( a)
+    r = torch.ops.extension_cpp.simple_takes_tensor( a)
     print(a) # Up to here is good.
     r = torch.ops.extension_cpp.simple_returns_tensor()
     print(r) # Good now!
@@ -30,10 +30,10 @@ else:
         
         a = torch.randn((2,2))
         b = torch.randn((2,2))
-        c = 1.0
+        # c = 1.0
         print("a:", a)
         print("b:", b)
         
-        r = torch.ops.extension_cpp.mymuladd(a,b,c)
+        r = torch.ops.extension_cpp.mymuladd(a,b)
         
         print("r:", r)

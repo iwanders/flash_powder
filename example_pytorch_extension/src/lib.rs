@@ -54,7 +54,7 @@ extern "C" fn my_init_function() {
      }
 
     */
-    let schema = c"mymuladd(Tensor a, Tensor b, float c) -> Tensor";
+    let schema = c"mymuladd(Tensor a, Tensor b) -> Tensor";
     unsafe_call_panic!(aoti_torch_library_def(
         LIBRARY_HANDLE.get().unwrap().0,
         schema.as_ptr(),
@@ -158,29 +158,34 @@ extern "C" fn my_init_function() {
         println!("Invoking the fun inputs:  {num_input:?} outputs: {num_outputs:?} ");
         let a_ivalue = unsafe { *stack.offset(0) };
         let a_stable_tensor: torch_stable::stable::tensor::Tensor = a_ivalue.try_into().unwrap();
+        println!("a_stable_tensor, get: {:?}", a_stable_tensor.get());
         let a_fp_tensor: Tensor = Tensor::new(a_stable_tensor);
         let b_ivalue = unsafe { *stack.offset(1) };
         let b_stable_tensor: torch_stable::stable::tensor::Tensor = b_ivalue.try_into().unwrap();
+        println!("b_stable_tensor, get: {:?}", b_stable_tensor.get());
         let b_fp_tensor: Tensor = Tensor::new(b_stable_tensor);
 
-        let res = a_fp_tensor.add(&b_fp_tensor).unwrap();
-        println!("res: {res:?}");
+        let res = a_fp_tensor.mul(&b_fp_tensor).unwrap();
+        // println!("res: {res:?}");
 
         // Leak both tensors tensors that we wrapped...?
         unsafe {
-            a_fp_tensor
-                .into_stable_tensor()
+            let a_to_stable_again = a_fp_tensor.into_stable_tensor();
+            println!("a_to_stable_again, get: {:?}", a_to_stable_again.get());
+            let tensor_opaque: AtenTensorHandle = a_to_stable_again
                 .into_inner()
-                .map(|a| a.into_raw());
+                .map(|a| a.into_raw())
+                .expect("should be extractable");
         }
         unsafe {
-            b_fp_tensor
+            let tensor_opaque: AtenTensorHandle = b_fp_tensor
                 .into_stable_tensor()
                 .into_inner()
-                .map(|a| a.into_raw());
+                .map(|a| a.into_raw())
+                .expect("should be extractable");
         }
 
-        let res: Tensor = 3i32.try_into().unwrap();
+        // let res: Tensor = 3i32.try_into().unwrap();
         // Next, we need to assign the result back into the stack.
         let stable_tensor = unsafe { res.into_stable_tensor() };
         // Oh we probably have to leak it here...
@@ -194,12 +199,6 @@ extern "C" fn my_init_function() {
         unsafe { *stack.offset(1) = StableIValue(0) };
         unsafe { *stack.offset(2) = StableIValue(0) };
         unsafe { *stack.offset(3) = StableIValue(0) };
-        /*let mut stack: [StableIValue; 3] = [
-            (self.get_tensor()).into(),
-            other.get_tensor().into(),
-            (&string).into(),
-        ];
-        unsafe_call_dispatch_panic!("aten::div", "Tensor_mode", stack.as_mut_slice());*/
     }
     unsafe_call_panic!(aoti_torch_library_impl(
         LIBRARY_HANDLE.get().unwrap().0,
