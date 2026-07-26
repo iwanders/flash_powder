@@ -22,6 +22,12 @@ impl Drop for TensorDropper {
         unsafe_call_panic!(aoti_torch_delete_tensor_object(self.0));
     }
 }
+impl TensorDropper {
+    ///  Convert the dropper into the handle, avoiding the delete.
+    pub fn into_raw(self) -> AtenTensorHandle {
+        self.0
+    }
+}
 // This should be safe I think? The handle should be fully safe to move around between threads and also for concurrent
 // access.
 unsafe impl Send for TensorDropper {}
@@ -43,6 +49,11 @@ impl Tensor {
     /// Direct access to the tensor handle.
     pub fn get(&self) -> AtenTensorHandle {
         self.ath.0
+    }
+
+    /// Leak the tensor and return the handle, this pybasses the
+    pub fn into_inner(self) -> Option<TensorDropper> {
+        Arc::into_inner(self.ath)
     }
 
     // https://github.com/pytorch/pytorch/blob/f2b47323ac2c438722c2db58aa31d9222676509d/torch/csrc/stable/tensor_struct.h#L126

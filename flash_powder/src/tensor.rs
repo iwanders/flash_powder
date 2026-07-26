@@ -44,6 +44,13 @@ impl Tensor {
         Self { tensor }
     }
 
+    /// Extract the stable tensor, going to the unsafe domain.
+    ///
+    /// This is only valid if this is a tensor that is owning its storage.
+    pub unsafe fn into_stable_tensor(self) -> StableTensor {
+        self.tensor
+    }
+
     /// Equivalent to torch.tensor(data)
     ///
     /// Always allocates in the provided data type, on the cpu.

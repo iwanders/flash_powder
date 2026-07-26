@@ -14,6 +14,17 @@ pub struct TorchLibraryOpaque {
     _private: [u8; 0],
 }
 pub type TorchLibraryHandle = *mut TorchLibraryOpaque;
+
+#[derive(Debug)]
+pub struct TorchLibraryHandleWrapper(pub *mut TorchLibraryOpaque);
+impl TorchLibraryHandleWrapper {
+    pub unsafe fn new_null() -> Self {
+        TorchLibraryHandleWrapper(std::ptr::null_mut())
+    }
+}
+unsafe impl std::marker::Send for TorchLibraryHandleWrapper {}
+unsafe impl std::marker::Sync for TorchLibraryHandleWrapper {}
+
 pub type AotiTorchLibraryImpl = extern "C" fn(*mut StableIValue /* data */, u64, u64);
 
 // Keep the order the same as the original file.

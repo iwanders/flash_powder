@@ -9,6 +9,8 @@ crate-type=["cdylib"]
 
 [dependencies]
 flash_powder = {workspace=true, features=["cuda" ]}
+torch_stable  = {workspace=true, features=["cuda" ]}
+anyhow  = {workspace=true }
 
 [build-dependencies]
 flash_powder = {workspace=true, features=["cuda" ]}

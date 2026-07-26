@@ -274,7 +274,9 @@ dependencies = [
 name = "example_pytorch_extension"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "flash_powder",
+ "torch_stable",
 ]
 
 [[package]]
