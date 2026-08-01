@@ -169,7 +169,10 @@ where
             // We expect this is already correctly scaled, so just normalise to u8.
             v.to(&fp::DType::U8.into())?
         } else {
-            bail!("image is not of a supported dtype")
+            bail!(
+                "image is not of a supported dtype, needs to be float or integer type, got {:?}",
+                v.dtype()
+            )
         };
 
         if info.bytes_per_pixel == 0 {
