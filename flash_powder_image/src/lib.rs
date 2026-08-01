@@ -391,7 +391,7 @@ impl<'a> TensorImageOperations for fp::Ten<'a> {
     ) -> StableTorchResult<Tensor> {
         let options = functional::InterpolateOptions {
             size: Some([size[0] as i64, size[1] as i64, 0]),
-            mode: mode,
+            mode,
             ..Default::default()
         };
         let with_more_dim = if self.dim() == 2 {

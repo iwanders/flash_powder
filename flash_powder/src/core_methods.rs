@@ -282,7 +282,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         Ok(r)
     }
 
-    /// Division with rouding mode
+    /// Division with rounding mode
     ///
     /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L2106-L2112)
     /// - [tensor method](https://docs.pytorch.org/docs/2.13/generated/torch.Tensor.div.html)
