@@ -69,7 +69,7 @@ extern "C" fn my_init_function() {
 
     // https://github.com/pytorch/pytorch/blob/v2.13.0/torch/csrc/stable/library.h#L63-L84
     let name = c"simple";
-    extern "C" fn fun_simple(stack: *mut StableIValue, num_input: u64, num_outputs: u64) {
+    extern "C" fn fun_simple(_stack: *mut StableIValue, num_input: u64, num_outputs: u64) {
         println!("RUST: Invoking the fun_simple inputs:  {num_input:?} outputs: {num_outputs:?} ");
     }
     unsafe_call_panic!(aoti_torch_library_impl(
@@ -88,7 +88,7 @@ extern "C" fn my_init_function() {
         // Take ownership of the input tensor:
         let a_ivalue = unsafe { *stack.offset(0) };
         let a_stable_tensor: StableTensor = a_ivalue.try_into().unwrap();
-        let a_fp_tensor: Tensor = Tensor::new(a_stable_tensor);
+        let _a_fp_tensor: Tensor = Tensor::new(a_stable_tensor);
         // Leaving the scope will destroy it.
 
         println!("RUST: return of simple_takes_tensor now, we will destroy the input tensor.");

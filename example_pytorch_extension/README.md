@@ -1,9 +1,12 @@
 # Pure Rust PyTorch extension
 
-Quick test of how to write a PyTorch extension using the stable ABI:
-
+Quick test of how to write a PyTorch extension using the stable ABI.
 
 Some docs on argument handling here: [the impl documentation](https://github.com/pytorch/pytorch/blob/v2.13.0/torch/csrc/stable/library.h#L63-L84) we need to own the memory and free it.
+
+This crate is built as an `crate-type=["cdylib"]` type crate such that it creates a `.so` file that we can then load from PyTorch.
+
+It's full of unsafe, this is really just a test to see whether this was feasible and I have no use care for it.
 
 
 ## Notes on C++

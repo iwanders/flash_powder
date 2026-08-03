@@ -233,6 +233,12 @@ Once that lands, a lot of methods should probably be changed to take either a Te
 Sometimes chains of borrows are problematic, like `let nonzero = counts.eq(&zero)?.squeeze()?` will result in a lifetime error as `squeeze` borrows, but the result of `counts.eq` goes out of scope, work around this by separating the statement or making it owning with `.to_owned()?;`.
 Should see if this can be made better.
 
+
+## Examples
+
+- [example_vgg](./example_vgg) Implements torchvisions' VGG network and shows it produces identical outputs, also leverages the `flash_powder_image` and `flash_powder_safetensors` crates.
+- [example_pytorch_extension](./[example_pytorch_extension) A hacked together pure-rust PyTorch extension library that can be loaded from python and provides kernels.
+
 ## Testing
 
 I want to ensure that the tensors & function arguments follow conventions from the Python side, so there's a heavy emphasis
