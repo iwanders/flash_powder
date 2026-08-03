@@ -633,7 +633,7 @@ impl<'a> Ten<'a> {
 /// Core methods that require mutable access.
 ///
 /// See the [`core_methods`][crate::core_methods] module for description of this trait's functionality.
-pub trait CoreMethodsMut: TensorAccessMut + TensorPropertiesMut {
+pub trait CoreMethodsMut: TensorAccessMut + TensorPropertiesMut + CoreMethods {
     fn narrow_mut(
         &mut self,
         dim: usize,
@@ -716,6 +716,21 @@ pub trait CoreMethodsMut: TensorAccessMut + TensorPropertiesMut {
         unsafe_call_dispatch_bail!("aten::copy_", "", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
         assert_eq!(self.const_data_ptr(), r.const_data_ptr());
+        Ok(())
+    }
+
+    /// self += other
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.11.0/aten/src/ATen/native/native_functions.yaml#L566)
+    /// - [tensor method](https://docs.pytorch.org/docs/2.13/generated/torch.Tensor.add_.html#torch.Tensor.add_)
+    ///
+    /// But we can't write `add_` current because we can't do a scalar operation, so we do an intermediate temporary variable.
+    fn add_assign<T: TensorAccess + TensorProperties>(
+        &mut self,
+        other: &T,
+    ) -> StableTorchResult<()> {
+        let temp = <Self as CoreMethods>::add(self, other)?;
+        self.copy_from_tensor(&temp)?;
         Ok(())
     }
 }
@@ -1656,6 +1671,37 @@ mod test {
             let a_in_cpu = a_cuda.cpu()?;
             assert!(a_in.is_equal(&a_in_cpu)?);
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_add_assign() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            x = torch.tensor(list(range(1,9)), dtype=torch.int64).reshape([2,2,2])
+            b = torch.tensor(list(range(1,5)), dtype=torch.int64).reshape([2,2])
+
+            x += b
+        */
+        let d = Tensor::from([1i64, 2, 3, 4, 5, 6, 7, 8])?;
+        let mut x = d.view(&[2, 2, 2])?.to_owned()?;
+        let b = Tensor::from([1i64, 2, 3, 4])?.view(&[2, 2])?.to_owned()?;
+
+        x.add_assign(&b)?;
+        assert_eq!(x.i64s_ref()?, &[2, 4, 6, 8, 6, 8, 10, 12]); // #PYTHON x.ravel().tolist()
+        assert_eq!(x.sizes(), &[2, 2, 2]); // #PYTHON list(x.shape)
+
+        /*
+            #|PYTHON
+
+            x[0:1, :] += b[0:1, :]
+        */
+        // Test on a mutable window.
+        x.i_mut((0..1, ..))?.add_assign(&b.i((0..1, ..))?)?;
+
+        assert_eq!(x.i64s_ref()?, &[3, 6, 7, 10, 6, 8, 10, 12]); // #PYTHON x.ravel().tolist()
+        assert_eq!(x.sizes(), &[2, 2, 2]); // #PYTHON list(x.shape)
 
         Ok(())
     }
