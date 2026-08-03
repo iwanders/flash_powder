@@ -35,7 +35,7 @@ extern "C" fn my_init_function() {
             1,
             &mut handle_res.0
         ));
-        println!("handle: {handle_res:?}");
+        println!("RUST: handle: {handle_res:?}");
         LIBRARY_HANDLE
             .set(handle_res)
             .expect("should be able to set it, this is called once");
@@ -70,7 +70,7 @@ extern "C" fn my_init_function() {
     // https://github.com/pytorch/pytorch/blob/v2.13.0/torch/csrc/stable/library.h#L63-L84
     let name = c"simple";
     extern "C" fn fun_simple(stack: *mut StableIValue, num_input: u64, num_outputs: u64) {
-        println!("Invoking the fun_simple inputs:  {num_input:?} outputs: {num_outputs:?} ");
+        println!("RUST: Invoking the fun_simple inputs:  {num_input:?} outputs: {num_outputs:?} ");
     }
     unsafe_call_panic!(aoti_torch_library_impl(
         LIBRARY_HANDLE.get().unwrap().0,
@@ -83,7 +83,7 @@ extern "C" fn my_init_function() {
     let name = c"simple_takes_tensor";
     extern "C" fn simple_takes_tensor(stack: *mut StableIValue, num_input: u64, num_outputs: u64) {
         println!(
-            "Invoking the simple_takes_tensor inputs:  {num_input:?} outputs: {num_outputs:?} "
+            "RUST: Invoking the simple_takes_tensor inputs:  {num_input:?} outputs: {num_outputs:?} "
         );
         // Take ownership of the input tensor:
         let a_ivalue = unsafe { *stack.offset(0) };
@@ -91,7 +91,7 @@ extern "C" fn my_init_function() {
         let a_fp_tensor: Tensor = Tensor::new(a_stable_tensor);
         // Leaving the scope will destroy it.
 
-        println!("return of simple_takes_tensor now, we will destroy the input tensor.");
+        println!("RUST: return of simple_takes_tensor now, we will destroy the input tensor.");
         unsafe { *stack.offset(0) = StableIValue(0) }; // clear the stack, it's only prudent.
     }
     unsafe_call_panic!(aoti_torch_library_impl(
@@ -107,7 +107,7 @@ extern "C" fn my_init_function() {
         num_outputs: u64,
     ) {
         println!(
-            "Invoking the simple_returns_tensor inputs:  {num_input:?} outputs: {num_outputs:?} "
+            "RUST: Invoking the simple_returns_tensor inputs:  {num_input:?} outputs: {num_outputs:?} "
         );
         // Create a fp::Tensor, convert it into StableTensor
         let res: fp::Tensor = 3i32.try_into().unwrap();
@@ -135,7 +135,7 @@ extern "C" fn my_init_function() {
     let name = c"mymuladd";
 
     extern "C" fn mymuladd_fun(stack: *mut StableIValue, num_input: u64, num_outputs: u64) {
-        println!("Invoking the fun inputs:  {num_input:?} outputs: {num_outputs:?} ");
+        println!("RUST: Invoking the fun inputs:  {num_input:?} outputs: {num_outputs:?} ");
 
         // Interpret the first stack variable as an tensor.
         let a_ivalue = unsafe { *stack.offset(0) };

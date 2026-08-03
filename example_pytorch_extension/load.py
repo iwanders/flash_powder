@@ -17,22 +17,30 @@ else:
     print(torch.ops.extension_cpp._dir)
     print(torch.ops.extension_cpp.mymuladd)
 
-     
+    # Call the simple one, this just prints 'test'
+    print("torch.ops.extension_cpp.simple")
     r = torch.ops.extension_cpp.simple()
+    print()
+
+    # Next, we can pass a tensor to takes simple tensor.
     a = torch.randn((2,2))
-    r = torch.ops.extension_cpp.simple_takes_tensor( a)
-    print(a) # Up to here is good.
+    print(f"torch.ops.extension_cpp.simple_takes_tensor with {a}")
+    r = torch.ops.extension_cpp.simple_takes_tensor(a)
+    print("\n")
+
+    
+    print("torch.ops.extension_cpp.simple_returns_tensor")
     r = torch.ops.extension_cpp.simple_returns_tensor()
-    print(r) # Good now!
+    print(f"simple returns tensor returned {r}\n")
 
 
     
     a = torch.randn((2,2))
     b = torch.randn((2,2))
-    # c = 1.0
+    
+    print("torch.ops.extension_cpp.mymuladd")
     print("a:", a)
     print("b:", b)
     
     r = torch.ops.extension_cpp.mymuladd(a,b)
-    
-    print("r:", r)
+    print(f"r: {r}\n")
