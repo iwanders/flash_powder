@@ -1,4 +1,22 @@
-//! Indexing
+//! Indexing traits
+//!
+//! Indexing is currently limited to pure read-only views into non-owning data, or mutable views into owning data.
+//!
+//!
+//! Follows python's indexing, with ranges, integers and 'all values', see this example:
+//! ```rust
+//! # use flash_powder::prelude::*;
+//! # use flash_powder::{StableTorchResult, Tensor, Ten, TenMut};
+//! # use flash_powder as fp;
+//!  fn indexing_function(d: &Ten<'_>, m: &mut TenMut<'_>) -> StableTorchResult<()>{
+//!   let z = d.i((1..3, .., 5, -3..3))?; // same as "z = d[1:3, :, 5, -3:3]" in python
+//!   let c = m.i_mut((1..3, .., 5, -3..3))?; // same as "c = m[1:3, :, 5, -3:3]" in python
+//!   Ok(())
+//!  }
+//! ```
+//! The indexing types that return by copy are currently not supported. If you need that functionality, take a look at:
+//!  - [`CoreMethods::index_tensor`]
+//!
 
 use crate::core_methods::{CoreMethods, CoreMethodsMut};
 use crate::properties::TensorProperties;
@@ -51,11 +69,13 @@ Tricky:
 #[derive(Clone)]
 pub enum TensorIndexOptions<'a> {
     // Can we even do this? this indexing method seems to return a copy instead of a view.
+    #[doc(hidden)]
     Tensor(&'a StableTensor),
     Index(isize),
     Range(std::ops::Range<isize>),
     RangeFull,
     // Can we even do this?
+    #[doc(hidden)]
     RangeWithStride {
         range: std::ops::Range<usize>,
         stride: isize,

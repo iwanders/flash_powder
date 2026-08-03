@@ -1,3 +1,6 @@
+//! DType enum for consistent types.
+//!
+//! This abstracts over the [`ScalarType`].
 use torch_stable::headeronly::core::ScalarType;
 
 pub trait ScalarDType {
