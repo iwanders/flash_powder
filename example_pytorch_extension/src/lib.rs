@@ -8,6 +8,59 @@
 // Which seems to just instantiate this class; https://github.com/pytorch/pytorch/blob/v2.13.0/torch/csrc/stable/library.h#L130-L146
 // WHich in turn calls the initFn on load. We an to the same.
 
+// In cpp, the following trivial example:
+/*
+
+```cpp
+torch::stable::Tensor mymuladd_cpu(
+    const torch::stable::Tensor& a,
+    const torch::stable::Tensor& b,
+    double c) {
+  return torch::stable::matmul(a, b);
+}
+
+STABLE_TORCH_LIBRARY(extension_cpp, m) {
+  m.def("mymuladd(Tensor a, Tensor b, float c) -> Tensor");
+}
+
+
+STABLE_TORCH_LIBRARY_IMPL(extension_cpp, CPU, m) {
+  m.impl("mymuladd", TORCH_BOX(&mymuladd_cpu));
+}
+```
+
+Expands into:
+
+```cpp
+torch::stable::Tensor mymuladd_cpu(
+    const torch::stable::Tensor& a,
+    const torch::stable::Tensor& b,
+    double c) {
+# 31 "/workspace/ivor/ml/pytorch_dev/custom_kernel_manual_build/muladd.cpp"
+  return torch::stable::matmul(a, b);
+}
+
+static void STABLE_TORCH_LIBRARY_init_extension_cpp( torch::stable::detail::StableLibrary&); static const torch::stable::detail::StableTorchLibraryInit STABLE_TORCH_LIBRARY_static_init_extension_cpp( torch::stable::detail::StableLibrary::Kind::DEF, &STABLE_TORCH_LIBRARY_init_extension_cpp, "extension_cpp", nullptr, "/workspace/ivor/ml/pytorch_dev/custom_kernel_manual_build/muladd.cpp", 34); void STABLE_TORCH_LIBRARY_init_extension_cpp(torch::stable::detail::StableLibrary& m) {
+
+
+  m.def("mymuladd(Tensor a, Tensor b, float c) -> Tensor");
+}
+
+
+static void STABLE_TORCH_LIBRARY_IMPL_init_extension_cpp_CPU_0(torch::stable::detail::StableLibrary&); static const torch::stable::detail::StableTorchLibraryInit STABLE_TORCH_LIBRARY_IMPL_static_init_extension_cpp_CPU_0( torch::stable::detail::StableLibrary::Kind::IMPL, &STABLE_TORCH_LIBRARY_IMPL_init_extension_cpp_CPU_0, "extension_cpp", "CPU", "/workspace/ivor/ml/pytorch_dev/custom_kernel_manual_build/muladd.cpp", 41); void STABLE_TORCH_LIBRARY_IMPL_init_extension_cpp_CPU_0( torch::stable::detail::StableLibrary & m) {
+  m.impl("mymuladd", torch::stable::detail::boxer< std::remove_pointer_t<std::remove_reference_t<decltype(&mymuladd_cpu)>>, (&mymuladd_cpu)>::boxed_fn);
+}
+```
+
+Which makes one wonder what that
+> torch::stable::detail::boxer< std::remove_pointer_t<std::remove_reference_t<decltype(&mymuladd_cpu)>>, (&mymuladd_cpu)>::boxed_fn
+
+Which seems to just be this; https://github.com/pytorch/pytorch/blob/f2b47323ac2c438722c2db58aa31d9222676509d/torch/csrc/stable/library.h#L290-L299
+
+So a function that takes the stack pointer and two argument values.
+
+*/
+
 use flash_powder as fp;
 use flash_powder::Tensor;
 use flash_powder::prelude::*;
@@ -106,13 +159,6 @@ extern "C" fn my_init_function() {
         println!("simple takes tensor {:?}", a_stable_tensor.get());
         let a_fp_tensor: Tensor = Tensor::new(a_stable_tensor);
         // println!("input tensor: {a_fp_tensor:?}");
-        // Leak the tensor we wrapped, since we don't actually own it...
-        unsafe {
-            a_fp_tensor
-                .into_stable_tensor()
-                .into_inner()
-                .map(|a| a.into_raw());
-        }
         println!("return of simple  takes tensor");
         unsafe { *stack.offset(0) = StableIValue(0) };
     }
@@ -154,7 +200,7 @@ extern "C" fn my_init_function() {
     //
     let name = c"mymuladd";
 
-    extern "C" fn fun(stack: *mut StableIValue, num_input: u64, num_outputs: u64) {
+    extern "C" fn mymuladd_fun(stack: *mut StableIValue, num_input: u64, num_outputs: u64) {
         println!("Invoking the fun inputs:  {num_input:?} outputs: {num_outputs:?} ");
         let a_ivalue = unsafe { *stack.offset(0) };
         let a_stable_tensor: torch_stable::stable::tensor::Tensor = a_ivalue.try_into().unwrap();
@@ -168,23 +214,6 @@ extern "C" fn my_init_function() {
         let res = a_fp_tensor.mul(&b_fp_tensor).unwrap();
         // println!("res: {res:?}");
 
-        // Leak both tensors tensors that we wrapped...?
-        unsafe {
-            let a_to_stable_again = a_fp_tensor.into_stable_tensor();
-            println!("a_to_stable_again, get: {:?}", a_to_stable_again.get());
-            let tensor_opaque: AtenTensorHandle = a_to_stable_again
-                .into_inner()
-                .map(|a| a.into_raw())
-                .expect("should be extractable");
-        }
-        unsafe {
-            let tensor_opaque: AtenTensorHandle = b_fp_tensor
-                .into_stable_tensor()
-                .into_inner()
-                .map(|a| a.into_raw())
-                .expect("should be extractable");
-        }
-
         // let res: Tensor = 3i32.try_into().unwrap();
         // Next, we need to assign the result back into the stack.
         let stable_tensor = unsafe { res.into_stable_tensor() };
@@ -196,14 +225,14 @@ extern "C" fn my_init_function() {
 
         let res_tensor: StableIValue = StableIValue(tensor_opaque as _);
         unsafe { *stack.offset(0) = res_tensor };
-        unsafe { *stack.offset(1) = StableIValue(0) };
-        unsafe { *stack.offset(2) = StableIValue(0) };
-        unsafe { *stack.offset(3) = StableIValue(0) };
+        // unsafe { *stack.offset(1) = StableIValue(0) };
+        // unsafe { *stack.offset(2) = StableIValue(0) };
+        // unsafe { *stack.offset(3) = StableIValue(0) };
     }
     unsafe_call_panic!(aoti_torch_library_impl(
         LIBRARY_HANDLE.get().unwrap().0,
         name.as_ptr(),
-        fun,
+        mymuladd_fun,
     ));
 }
 use std::sync::OnceLock;

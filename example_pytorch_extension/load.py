@@ -26,7 +26,7 @@ else:
     print(r) # Good now!
 
 
-    if False:
+    if True:
         
         a = torch.randn((2,2))
         b = torch.randn((2,2))
