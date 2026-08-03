@@ -26,14 +26,13 @@ else:
     print(r) # Good now!
 
 
-    if True:
-        
-        a = torch.randn((2,2))
-        b = torch.randn((2,2))
-        # c = 1.0
-        print("a:", a)
-        print("b:", b)
-        
-        r = torch.ops.extension_cpp.mymuladd(a,b)
-        
-        print("r:", r)
+    
+    a = torch.randn((2,2))
+    b = torch.randn((2,2))
+    # c = 1.0
+    print("a:", a)
+    print("b:", b)
+    
+    r = torch.ops.extension_cpp.mymuladd(a,b)
+    
+    print("r:", r)
