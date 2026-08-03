@@ -12,5 +12,12 @@ flash_powder = {workspace=true, features=["cuda" ]}
 torch_stable  = {workspace=true, features=["cuda" ]}
 anyhow  = {workspace=true }
 
+
+# This is only here because otherwise 'cargo t' complains with a linker error, it's not actually necessary to build the
+# extension.
+[build-dependencies]
+torch_stable  = {workspace=true, features=["cuda" ]}
+
+
 [lints]
 workspace = true
