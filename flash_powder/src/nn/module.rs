@@ -7,7 +7,7 @@ use crate::{
     core_methods::{CoreMethods as _, CoreMethodsMut},
 };
 
-pub use std::collections::HashSet;
+use std::collections::HashSet;
 
 /// Value enum for [`StateDict`].
 #[derive(Debug, Clone)]
@@ -92,6 +92,9 @@ impl StateDict {
     }
 }
 
+/// Interface trait to a [`StateDict`]
+///
+/// This allows other types to implement this, as the `flash_powder_safetensors` crate does.
 pub trait StateDictAdaptor {
     fn ten<'d>(&'d self, name: &str) -> Option<Ten<'d>>;
     fn ten_required<'d>(&'d self, name: &str) -> StableTorchResult<Ten<'d>> {
@@ -139,6 +142,8 @@ pub trait StateDictReader: StateDictAdaptor {
         }
     }
 }
+
+/// View into a namespaced section of a StateDict.
 pub struct NamespacedStateDictAdaptor<'a> {
     v: &'a dyn StateDictAdaptor,
     namespace: Vec<String>,
@@ -192,6 +197,7 @@ impl<'a> From<&'a Option<Tensor>> for ModuleTensor<'a> {
     }
 }
 
+/// Helper type to expose the tensors in a module.
 #[derive(Debug, Default)]
 pub struct ModuleTensors<'a> {
     map: std::collections::HashMap<String, ModuleTensor<'a>>,
@@ -278,6 +284,7 @@ impl<'a> ModuleTensorMut<'a> {
 
 // And the exact same with Mut :/
 
+/// Helper type to mutably expose the tensors in a module.
 #[derive(Debug, Default)]
 pub struct ModuleTensorsMut<'a> {
     map: std::collections::HashMap<String, ModuleTensorMut<'a>>,
@@ -354,30 +361,31 @@ impl<'a> ModuleTensorsMut<'a> {
     }
 }
 
+/// Options that configure how state dict is performed.
 #[derive(Debug, Copy, Clone)]
 pub struct StateDictLoadOptions {
     /// State dictionary keys must strictly be equivalent to the Module keys.
     ///
-    /// Identical to the python functionality.
+    /// Identical to the python functionality. Defaults to true.
     pub strict: bool,
 
     /// Assign the tensors in the module instead of copying the data into them.
     ///
     /// This wipes the tensor properties in the module completely and uses those from the state dict.
     ///
-    /// Identical to the python functionality.
+    /// Identical to the python functionality. Defaults to false.
     pub assign: bool,
 
     /// Clear optional tensors if present in the destination but not in the state dictionary.
     ///
-    /// This has no equivalent on the python side.
+    /// This has no equivalent on the python side. Defaults to false.
     pub clear_optional: bool,
 
     /// Populate optional tensors if not yet populated in the destination and present in the state dictionary.
     ///
     /// This always assigns, regardless of the [`StateDictLoadOptions::assign`] field.
     ///
-    /// This has no equivalent on the python side.
+    /// This has no equivalent on the python side. Defaults to false.
     pub populate_optional: bool,
 }
 

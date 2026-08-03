@@ -195,6 +195,7 @@ pub fn adaptive_avg_pool2d<I: TensorAccess>(
     Ok(Tensor::new(r))
 }
 
+/// Interpolation algorithm used.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub enum InterpolateAlgorithm {
     #[default]
@@ -231,6 +232,10 @@ impl Default for InterpolateOptions {
         }
     }
 }
+
+/// Interpolate
+///
+/// - [pytorch functional](https://docs.pytorch.org/docs/2.13/generated/torch.nn.functional.interpolate.html)
 pub fn interpolate<T: TensorAccess + TensorProperties>(
     input: &T,
     options: &InterpolateOptions,

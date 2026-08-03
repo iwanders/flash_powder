@@ -70,7 +70,12 @@ pub use dtype::DType;
 pub use tensor::{Ten, TenMut, Tensor, TensorAccess, TensorAccessMut};
 pub use torch_stable::StableTorchResult;
 
-pub use torch_stable::headeronly::core::{Layout, MemoryFormat};
+/// Layout of a tensor (almost always [`Layout::Strided`])
+pub use torch_stable::headeronly::core::Layout;
+/// MemoryFormat of a tensor.
+pub use torch_stable::headeronly::core::MemoryFormat;
+
+/// Device struct, with both type and device index.
 pub use torch_stable::stable::device::Device;
 
 pub use torch_stable;

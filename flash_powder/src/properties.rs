@@ -4,6 +4,7 @@ use crate::{Ten, TenMut, Tensor, TensorAccess, TensorAccessMut, dtype::DType};
 use torch_stable::headeronly::core::Layout;
 use torch_stable::stable::device::{Device, DeviceIndex};
 
+/// Fundamental tensor properties like size, dimensionality, type etc.
 pub trait TensorProperties: TensorAccess {
     fn dim(&self) -> usize {
         self.get_tensor().dim()
@@ -93,6 +94,12 @@ impl TensorProperties for Tensor {}
 impl<'a> TensorProperties for Ten<'a> {}
 impl<'a> TensorProperties for TenMut<'a> {}
 
+/// Fundamental mutable tensor properties.
+///
+/// This is a bit of an odd thing, but this is necessary because [`TensorPropertiesMut::mutable_data_ptr`] needs to have
+/// a mutable borrow, but this also materializes a lazily cloned tensor and allows its contents to be changed, so it
+/// can't be implemented for [`Ten<'_>`].
+///
 pub trait TensorPropertiesMut: TensorAccessMut + TensorProperties {
     fn mutable_data_ptr(&mut self) -> *mut u8 {
         self.get_tensor_mut().mutable_data_ptr()

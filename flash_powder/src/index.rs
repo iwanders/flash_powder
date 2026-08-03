@@ -182,6 +182,7 @@ impl TensorIndexWorker for TenMut<'_> {}
 pub trait IndexSpec<T> {
     fn do_index<'b>(&self, tensor: &'b T) -> StableTorchResult<Ten<'b>>;
 }
+/// Read only indexing that borrows.
 pub trait TensorIndex: TensorAccess + TensorProperties + CoreMethods + Sized {
     fn i<'a, I: IndexSpec<Self>>(&'a self, index: I) -> StableTorchResult<Ten<'a>> {
         index.do_index(self)
@@ -325,6 +326,8 @@ impl TensorIndexWorkerMut for TenMut<'_> {}
 pub trait IndexSpecMut<T> {
     fn do_index_mut<'b>(&self, tensor: &'b mut T) -> StableTorchResult<TenMut<'b>>;
 }
+
+/// Mutable indexing that returns a mutable borrow.
 pub trait TensorIndexMut: TensorAccess + TensorProperties + CoreMethodsMut + Sized {
     fn i_mut<'a, I: IndexSpecMut<Self>>(&'a mut self, index: I) -> StableTorchResult<TenMut<'a>> {
         index.do_index_mut(self)
