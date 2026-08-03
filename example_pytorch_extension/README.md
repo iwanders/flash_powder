@@ -8,6 +8,7 @@ This crate is built as an `crate-type=["cdylib"]` type crate such that it create
 
 It's full of unsafe, this is really just a test to see whether this was feasible and I have no use care for it.
 
+See [./load.py](load.py) for how this is used from the Python side.
 
 ## Notes on C++
 

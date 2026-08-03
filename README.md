@@ -237,7 +237,7 @@ Should see if this can be made better.
 ## Examples
 
 - [example_vgg](./example_vgg) Implements torchvisions' VGG network and shows it produces identical outputs, also leverages the `flash_powder_image` and `flash_powder_safetensors` crates.
-- [example_pytorch_extension](./example_pytorch_extension) A hacked together pure-rust PyTorch extension library that can be loaded from python and provides kernels.
+- [example_pytorch_extension](./example_pytorch_extension) A prototype pure-rust PyTorch extension library that can be loaded from python and provides kernels.
 
 ## Testing
 

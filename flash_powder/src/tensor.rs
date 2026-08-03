@@ -47,6 +47,10 @@ impl Tensor {
     /// Extract the stable tensor, going to the unsafe domain.
     ///
     /// This is only valid if this is a tensor that is owning its storage.
+    ///
+    /// # Safety
+    /// Marked as unsafe because going into the [`StableTensor`] means you have to be really careful with what you
+    /// are working with.
     pub unsafe fn into_stable_tensor(self) -> StableTensor {
         self.tensor
     }

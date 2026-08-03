@@ -2,6 +2,7 @@ use flash_powder as fp;
 use flash_powder::Tensor;
 use flash_powder::prelude::*;
 
+use std::sync::OnceLock;
 use torch_stable::aoti_torch::AtenTensorHandle;
 use torch_stable::{
     aoti_torch::{
@@ -12,15 +13,15 @@ use torch_stable::{
     unsafe_call_panic,
 };
 
+// Static global to hold the library handle we'll register and use to put our methods on.
+static LIBRARY_HANDLE: OnceLock<TorchLibraryHandleWrapper> = OnceLock::new();
+
 // Super janky initialisation function that runs my_init_function when this library is loaded.
 #[used]
 #[unsafe(link_section = ".init_array")]
 static INIT_FUNC: extern "C" fn() = my_init_function;
 
-use std::sync::OnceLock;
-
-static LIBRARY_HANDLE: OnceLock<TorchLibraryHandleWrapper> = OnceLock::new();
-
+// This init function is called once at library load.
 extern "C" fn my_init_function() {
     println!("test");
 
@@ -65,6 +66,7 @@ extern "C" fn my_init_function() {
         LIBRARY_HANDLE.get().unwrap().0,
         c"simple_returns_tensor() -> (Tensor)".as_ptr(),
     ));
+
     // Next, we need to actually provide the implementation for it.
 
     // https://github.com/pytorch/pytorch/blob/v2.13.0/torch/csrc/stable/library.h#L63-L84

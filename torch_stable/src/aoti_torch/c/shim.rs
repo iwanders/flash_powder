@@ -18,6 +18,11 @@ pub type TorchLibraryHandle = *mut TorchLibraryOpaque;
 #[derive(Debug)]
 pub struct TorchLibraryHandleWrapper(pub *mut TorchLibraryOpaque);
 impl TorchLibraryHandleWrapper {
+    /// Create an uninitialised and invalid library handle wrapper
+    ///
+    /// # Safety
+    /// Creates a nullptr initialised wrapper that doesn't actually hold anything that can be safely dereferenced.
+    /// Use the [`aoti_torch_library_init_def`] function to properly allocate a reference.
     pub unsafe fn new_null() -> Self {
         TorchLibraryHandleWrapper(std::ptr::null_mut())
     }

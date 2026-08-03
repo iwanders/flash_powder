@@ -5,7 +5,7 @@ from pathlib import Path
 
 sopath = Path(__file__).parent.parent / "target" / "debug"/ "libexample_pytorch_extension.so"
 
-# Use this to test whether the loading actually works.
+# Use this to test whether the initialisation actually runs.
 if False:
     import sys
     my_lib = ctypes.CDLL(sopath)
