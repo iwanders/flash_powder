@@ -214,6 +214,19 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
         Ok(r)
     }
 
+    /// Tests if all elements in input in the given dimension evaluate true.
+    ///
+    /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L685-L691)
+    /// - [tensor method](https://docs.pytorch.org/docs/2.13/generated/torch.Tensor.all.html#torch.Tensor.all)
+    /// - [pytorch method](https://docs.pytorch.org/docs/2.13/generated/torch.all.html)
+    fn all_dim(&self, dim: isize, keepdim: Option<bool>) -> StableTorchResult<Tensor> {
+        let keepdim = keepdim.unwrap_or(false);
+        let mut stack: [StableIValue; 3] = [(self.get_tensor()).into(), dim.into(), keepdim.into()];
+        unsafe_call_dispatch_panic!("aten::all", "dim", stack.as_mut_slice());
+        let r: Tensor = Tensor::new(stack[0].try_into().unwrap());
+        Ok(r)
+    }
+
     /// Perform a full clone of the tensor, not a lazy one.
     ///
     /// This is different from [`Tensor::clone`], which calls [`Self::lazy_clone`] because this actually performs the
@@ -1702,6 +1715,35 @@ mod test {
 
         assert_eq!(x.i64s_ref()?, &[3, 6, 7, 10, 6, 8, 10, 12]); // #PYTHON x.ravel().tolist()
         assert_eq!(x.sizes(), &[2, 2, 2]); // #PYTHON list(x.shape)
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_all_dim() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            d = torch.tensor([[True, True],
+                    [True, False],
+                    [True, True],
+                    [True, True]], dtype=torch.bool)
+            a = torch.all(d, dim=1)
+            b = torch.all(d, dim=0)
+        */
+        //all_dim
+        let d = Tensor::from([[true, true], [true, false], [true, true], [true, true]])?;
+        assert_eq!(
+            d.bools_ref()?,
+            &[true, true, true, false, true, true, true, true]
+        ); // #PYTHON d.ravel().tolist()
+        assert_eq!(d.sizes(), &[4, 2]); // #PYTHON list(d.shape)
+
+        let a = d.all_dim(1, None)?;
+        assert_eq!(a.bools_ref()?, &[true, false, true, true]); // #PYTHON a.ravel().tolist()
+        assert_eq!(a.sizes(), &[4]); // #PYTHON list(a.shape)
+        let b = d.all_dim(0, None)?;
+        assert_eq!(b.bools_ref()?, &[true, false]); // #PYTHON b.ravel().tolist()
+        assert_eq!(b.sizes(), &[2]); // #PYTHON list(b.shape)
 
         Ok(())
     }
