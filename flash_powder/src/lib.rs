@@ -28,20 +28,23 @@
 /*
 
 Todo;
-    - Figure out how do we want to do overloads??? SHould it take input arguments?
+    - Figure out overloads convention. SHould it take input arguments?
         - Example is squeeze_dim; https://github.com/pytorch/pytorch/blob/v2.12.0/aten/src/ATen/native/native_functions.yaml#L5856
         - mean(tensor) https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L4041
         - and mean(&self, mean_options: &MeanOptions) are already ruined :(
-        - Since overloads can always be added, we should probably always just use the full name with _ in between?
+        - Since overloads can always be added, we should probably always just use the full name with _ in between? And just always use the kernel name?
 
 Nice to have:
     - Printing with scientific mode / int mode, see comment in printing.rs
+        - Printing has an oddity... printing a boolean mask may truncate 'false' to 'fals'... should check what pytorch does and copy that.
+          could just bump the width to be 5 instead of 4.
     - Summarized printing without copying the entire tensor to contiguous and cpu, only copy what is printed.
     - Note on >= operator;
         // This function has like 5 overloads, the most important are Scalar and Tensor, for now we require TensorAccess
         // in the future, after Scalar is created, we can drop that req in Favour of a ScalarOrTensor trait, which would
         // allow us to handle both with the same function, and also support casting native types to Scalar.
         fn ge<T: TensorAccess + Into<StableIValue>>(&self, other: &T) -> StableTorchResult<Tensor> {
+        And check if the actually collides with Rust's ge trait?
 
 
 Tricky:
