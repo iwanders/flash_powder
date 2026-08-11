@@ -59,7 +59,7 @@ Or create them with any of the [factory](flash_powder/src/factory.rs) trait meth
 ```rust
 let a = Tensor::empty(&[5, 5], &Default::default()); // Defaults to cpu, f32
 let t = Tensor::randn(&[3, 3], &fp::Device::CPU.into())?; // We can give it a device to create it on
-let e = Tensor::zeros(&[6, 6], &fp::DType::U8.into())?; // Or specify a type (or mix these options).
+let mut e = Tensor::zeros(&[6, 6], &fp::DType::U8.into())?; // Or specify a type (or mix these options).
 ```
 
 The properties of a tensor, like `dtype()`, `device()` and `sizes()` are all provided by the `TensorProperties` trait from the [properties](flash_powder/src/properties.rs) module.
@@ -196,6 +196,10 @@ Update manually with
 cargo update
 ```
 
+### Usage tips
+
+- Use `RUST_BACKTRACE=1` to ensure propagated errors from the ABI print a backtrace to point at which line caused the
+  error.
 
 ### v2.13
 The minimum PyTorch/libTorch version is 2.13, which was the version under development when I reached out about this ffi
@@ -203,7 +207,8 @@ use case with [this comment](https://github.com/pytorch/pytorch/issues/174507#is
 a followup [issue](https://github.com/pytorch/pytorch/issues/179427) around lack of error retrieval functionality was created.
 The proposed changes were incorporated [in this PR](https://github.com/pytorch/pytorch/pull/180135), and improved in a [followup](https://github.com/pytorch/pytorch/pull/183823).
 The lack of allocator/deleter for `StableIValue` was addressed [in this PR](https://github.com/pytorch/pytorch/pull/179421).
-The `v2_13` feature was removed in [`fdb282`](https://github.com/iwanders/flash_powder/commit/fdb282381e3fd7458008a69fa04208dfcfad688d), the stable ivalue creation workaround in [`60b505fd1`](https://github.com/iwanders/flash_powder/commit/60b505fd17c5b3ab1f45f6b2bfe3aa85cc4d2d1f), with these reinstated it could run on older versions.
+
+The `v2_13` feature was removed from flash powder in [`fdb282`](https://github.com/iwanders/flash_powder/commit/fdb282381e3fd7458008a69fa04208dfcfad688d), the stable ivalue creation workaround in [`60b505fd1`](https://github.com/iwanders/flash_powder/commit/60b505fd17c5b3ab1f45f6b2bfe3aa85cc4d2d1f), with these reinstated it could run on older versions.
 
 ### v2.14
 Prior to v2.14, there's a tiny memory leak in the conversion between StableIValue's to String, fixed in [this PR](https://github.com/pytorch/pytorch/pull/190493).

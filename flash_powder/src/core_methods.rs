@@ -686,6 +686,10 @@ pub trait CoreMethodsMut: TensorAccessMut + TensorPropertiesMut + CoreMethods {
     }
 
     /// Fill a tensor with a value that's convertible to a tensor.
+    ///
+    /// - This does allow filling tensors with different types, casting happens under the hood.
+    /// - This can be used to fill a tensor on a different device.
+    /// - The fill operation only allows scalars / scalar tensors.
     fn fill_with<T>(&mut self, value: T) -> StableTorchResult<()>
     where
         T: TryInto<Tensor>,
