@@ -679,9 +679,20 @@ pub trait CoreMethodsMut: TensorAccessMut + TensorPropertiesMut + CoreMethods {
         assert_eq!(retrieve.const_data_ptr(), self.const_data_ptr());
         Ok(())
     }
+
     fn fill_f64(&mut self, value: f64) -> StableTorchResult<()> {
         unsafe_call_bail!(aoti_torch_aten_fill__Scalar(self.get_tensor().get(), value));
         Ok(())
+    }
+
+    /// Fill a tensor with a value that's convertible to a tensor.
+    fn fill_with<T>(&mut self, value: T) -> StableTorchResult<()>
+    where
+        T: TryInto<Tensor>,
+        <T as TryInto<Tensor>>::Error: Into<anyhow::Error> + Send + Sync + 'static,
+    {
+        let v: Tensor = value.try_into().map_err(|a| a.into())?;
+        self.fill_tensor(&v)
     }
 
     /// View into a tensor
@@ -1744,6 +1755,41 @@ mod test {
         let b = d.all_dim(0, None)?;
         assert_eq!(b.bools_ref()?, &[true, false]); // #PYTHON b.ravel().tolist()
         assert_eq!(b.sizes(), &[2]); // #PYTHON list(b.shape)
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_flash_powder_fill_with() -> StableTorchResult<()> {
+        // Fill f32 tensor with f64: works.
+        let mut a_in: Tensor = [-3.0f32, -2.0].try_into()?;
+        a_in.fill_with(5.5f64)?;
+
+        // Verify numbers, and check it is still the correct type.
+        assert_eq!(a_in.f32_ref(&[0])?, &5.5);
+        assert_eq!(a_in.f32_ref(&[1])?, &5.5);
+        assert_eq!(a_in.dtype(), DType::F32);
+
+        let a_in_cpu = a_in.cpu()?;
+        assert!(a_in.is_equal(&a_in_cpu)?);
+
+        // Move the tensor to cuda, fill it with a non cuda tensor.
+        #[cfg(feature = "cuda")]
+        {
+            let a_in: Tensor = [-3.0f32, -2.0].try_into()?;
+            let mut a_cuda = a_in.to(&crate::Device::CUDA.into())?;
+            assert_eq!(
+                a_cuda.device().device_type(),
+                crate::Device::CUDA.device_type()
+            );
+            a_cuda.fill_with(5.5f64)?;
+
+            let a_from_cuda_in_cpu = a_cuda.cpu()?;
+            assert_eq!(a_from_cuda_in_cpu.f32_ref(&[0])?, &5.5);
+            assert_eq!(a_from_cuda_in_cpu.f32_ref(&[1])?, &5.5);
+            assert_eq!(a_from_cuda_in_cpu.dtype(), DType::F32);
+            assert!(a_in_cpu.is_equal(&a_from_cuda_in_cpu)?);
+        }
 
         Ok(())
     }
