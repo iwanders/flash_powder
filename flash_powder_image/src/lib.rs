@@ -290,6 +290,15 @@ pub trait TensorFromImage {
     /// Read an image from disk.
     ///
     /// This loads an [`image::DynamicImage`] from disk and calls [`ImageToTensor::to_tensor`] on it.
+    ///
+    /// TL;DR:
+    ///
+    /// The values of the output tensor are in [`fp::DType::U8`] in `[0, 255]` for most cases, it's shape is `[C, H, W]`.
+    ///
+    /// Images always become 3 dimensional;
+    /// - greyscale: `[1, H, W]`.
+    /// - rgb:  `[3, H, W]`.
+    /// - rgba: `[4, H, W]`.
     fn read_image<Q>(path: Q) -> StableTorchResult<Tensor>
     where
         Q: AsRef<std::path::Path>;
