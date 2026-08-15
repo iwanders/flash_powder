@@ -246,7 +246,7 @@ mod test {
         let d = Tensor::randn(&[1000, 1000], &Default::default())?;
         assert_eq!(d.sizes(), &[1000, 1000]);
 
-        let mean = d.mean(&Default::default())?;
+        let mean = d.mean_dim(&Default::default())?;
         let value = mean.f32s_ref()?[0];
         assert!(value.abs() < 0.01);
 

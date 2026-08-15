@@ -34,6 +34,20 @@ Todo;
         - and mean(&self, mean_options: &MeanOptions) are already ruined :(
         - Since overloads can always be added, we should probably always just use the full name with _ in between? And just always use the kernel name?
 
+    Okay, I gave this lots of thought.
+        - Assuming combination of the function name & overload is unique in native_functions.
+        - Some operations have both tensor and scalar flavour. Lets assume in the future we get scalar support.
+        - Lets just concatenate with an underscore:
+            - mean.dim -> mean_dim
+            - flatten.using_ints -> flatten_using_ints
+            - add.{Tensor,Scalar} -> add
+            - div.{Tensor,Scalar}_mode -> div_mode
+        - Operations that return a mutable view get `_mut` added.
+        - Some descretion is allowed, _lazy_clone -> lazy_clone, and a.view_mut(&a.sizes()) -> a.ten_mut()
+        - Moving conversions get `into_` prefixed; `into_select_mut`.
+
+
+
 Nice to have:
     - Printing with scientific mode / int mode, see comment in printing.rs
         - Printing has an oddity... printing a boolean mask may truncate 'false' to 'fals'... should check what pytorch does and copy that.

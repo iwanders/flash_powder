@@ -177,7 +177,7 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     /// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L4055)
     /// - [pytorch method](https://docs.pytorch.org/docs/2.12/generated/torch.Tensor.mean.html)
     /// - [pytorch function](https://docs.pytorch.org/docs/2.12/generated/torch.mean.html#torch.mean)
-    fn mean(&self, mean_options: &MeanOptions) -> StableTorchResult<Tensor> {
+    fn mean_dim(&self, mean_options: &MeanOptions) -> StableTorchResult<Tensor> {
         // https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L4489
         let as_array = mean_options.dim.as_ref().map(|z| [*z]);
         let as_array = as_array.as_ref().map(|a| a.as_slice());
@@ -274,7 +274,11 @@ pub trait CoreMethods: TensorAccess + TensorProperties {
     /// - [tensor method](https://docs.pytorch.org/docs/2.11/generated/torch.Tensor.flatten.html#torch.Tensor.flatten)
     /// - [pytorch method](https://docs.pytorch.org/docs/2.11/generated/torch.flatten.html#torch.flatten)
     // Todo? maybe make this take a range? .flatten(..) or .flatten(3..) has a nice ring to it?
-    fn flatten(&self, start_dim: usize, end_dim: Option<usize>) -> StableTorchResult<Tensor> {
+    fn flatten_using_ints(
+        &self,
+        start_dim: usize,
+        end_dim: Option<usize>,
+    ) -> StableTorchResult<Tensor> {
         let end = end_dim.map(|z| z as isize).unwrap_or(-1);
         let mut stack: [StableIValue; 3] =
             [(self.get_tensor()).into(), start_dim.into(), end.into()];
@@ -614,7 +618,7 @@ impl<'a> Ten<'a> {
         Ok(Ten::new(self.as_parent(), stack[0].try_into()?))
     }
 
-    pub fn select(&self, dim: usize, index: usize) -> StableTorchResult<Ten<'a>> {
+    pub fn select_int(&self, dim: usize, index: usize) -> StableTorchResult<Ten<'a>> {
         let mut stack: [StableIValue; 3] = [self.get_tensor().into(), dim.into(), index.into()];
         unsafe_call_dispatch_bail!("aten::select", "int", stack.as_mut_slice());
         let r: StableTensor = stack[0].try_into()?;
@@ -1038,11 +1042,11 @@ mod test {
         ]])?;
         assert_eq!(d.sizes(), &[1, 4, 4]); // #PYTHON list(d.shape)
 
-        let mean = d.mean(&Default::default())?;
+        let mean = d.mean_dim(&Default::default())?;
         assert_eq!(mean.dim(), 0); // #PYTHON mean.dim()
         assert_eq!(mean.f32s_ref()?, &[8.5f32]); // #PYTHON list(mean.view(-1).tolist())
 
-        let mean_0 = d.mean(&MeanOptions {
+        let mean_0 = d.mean_dim(&MeanOptions {
             dim: Some(0),
             ..Default::default()
         })?;
@@ -1055,21 +1059,21 @@ mod test {
             ]
         ); // #PYTHON list(mean_0.view(-1).tolist())
 
-        let mean_1 = d.mean(&MeanOptions {
+        let mean_1 = d.mean_dim(&MeanOptions {
             dim: Some(1),
             ..Default::default()
         })?;
         assert_eq!(mean_1.sizes(), &[1, 4]); // #PYTHON list(mean_1.shape)
         assert_eq!(mean_1.f32s_ref()?, &[7.0f32, 8.0, 9.0, 10.0]); // #PYTHON list(mean_1.view(-1).tolist())
 
-        let mean_2 = d.mean(&MeanOptions {
+        let mean_2 = d.mean_dim(&MeanOptions {
             dim: Some(2),
             ..Default::default()
         })?;
         assert_eq!(mean_2.sizes(), &[1, 4]); // #PYTHON list(mean_2.shape)
         assert_eq!(mean_2.f32s_ref()?, &[2.5f32, 6.5, 10.5, 14.5]); // #PYTHON list(mean_2.view(-1).tolist())
 
-        let mean_1_double = d.mean(&MeanOptions {
+        let mean_1_double = d.mean_dim(&MeanOptions {
             dim: Some(1),
             dtype: Some(DType::F64),
             ..Default::default()
@@ -1154,10 +1158,10 @@ mod test {
             l = torch.flatten(t)
             two = torch.flatten(t, 1)
         */
-        let l = t.flatten(0, None)?;
+        let l = t.flatten_using_ints(0, None)?;
         assert_eq!(l.sizes(), &[8]); // #PYTHON list(l.shape)
 
-        let l = t.flatten(1, None)?;
+        let l = t.flatten_using_ints(1, None)?;
         assert_eq!(l.sizes(), &[2, 4]); // #PYTHON list(two.shape)
 
         Ok(())

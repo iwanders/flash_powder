@@ -61,7 +61,7 @@ impl nn::Module for VGG {
     fn forward(&self, input: &Ten<'_>) -> Result<Tensor, anyhow::Error> {
         let mut r = self.features.forward(input)?;
         r = functional::adaptive_avg_pool2d(&r, (7, 7))?;
-        r = r.flatten(1, None)?;
+        r = r.flatten_using_ints(1, None)?;
         r = self.classifier.forward(&r.ten()?)?;
 
         Ok(r)

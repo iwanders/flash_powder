@@ -142,7 +142,7 @@ trait TensorIndexWorker: CoreMethods {
                     if DEBUG {
                         println!("Before select shape: {:?}", current.shape());
                     }
-                    current = current.select(current_dim, *index as usize)?;
+                    current = current.select_int(current_dim, *index as usize)?;
                     // current = current.narrow(current_dim, *index, 1)?.into_squeeze()?;
                     if DEBUG {
                         println!("After select shape: {:?}", current.shape());
