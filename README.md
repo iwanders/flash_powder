@@ -196,7 +196,7 @@ Update manually with
 cargo update
 ```
 
-### Usage tips
+### Tips
 
 - Use `RUST_BACKTRACE=1` to ensure propagated errors from the ABI print a backtrace to point at which line caused the
   error.
@@ -237,6 +237,20 @@ Once that lands, a lot of methods should probably be changed to take either a Te
 
 Sometimes chains of borrows are problematic, like `let nonzero = counts.eq(&zero)?.squeeze()?` will result in a lifetime error as `squeeze` borrows, but the result of `counts.eq` goes out of scope, work around this by separating the statement or making it owning with `.to_owned()?;`.
 Should see if this can be made better.
+
+### Method naming
+
+For the longest time naming was a bit ad-hoc, but I think uniform emerged:
+
+- Some operations have both tensor and scalar flavour. Lets assume that in the future we can handle scalars.
+- The core contention, drop `aten:`, use underscore between overload and lowercase it.
+    - [`mean.dim`](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L3895) -> `mean_dim`.
+    - [`flatten.using_ints`](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L2600) -> `flatten_using_ints`.
+    - `add.{`[`Tensor`](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L536),[`Scalar`](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L604)}` -> `add`.
+    - `div.{`[`Tensor`](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L2106),[`Scalar`](https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L2148)}_mode` -> `div_mode`.
+- Operations that return a mutable view get `_mut` added, so `view() -> Ten` and `view_mut() -> TenMut` to fit Rust conventions.
+- Moving conversions like `TenMut::into_select_mut(self,...)` get `into_` prefixed.
+- Some cleanup / helpers exist, `_lazy_clone` -> `lazy_clone`, and `a.view_mut(&a.sizes())` -> `a.ten_mut()` (should these be in a separate trait?)
 
 
 ## Examples
