@@ -2,14 +2,21 @@
 
 > What makes light and works through oxidization? Flash Powder.
 
-
-A very minimal rust wrapper for libtorch, using the [Torch Stable API](https://docs.pytorch.org/cppdocs/stable.html) only.
-This is mostly my project to gain a better understanding of how (lib/py)torch works under the hood. I do not recommend using this.
-
-The stable ABI doesn't expose all functionality of libtorch, but a surprising amount of functionality is available,
-especially if the goal is just to do inference. The [example_vgg](./example_vgg) crate holds an implementation of vgg11.
+Idiomatic Rust bindings for LibTorch/PyTorch, using only the [Torch Stable ABI](https://docs.pytorch.org/docs/main/notes/libtorch_stable_abi.html).
 
 This was developed for doing postprocessing and inference with an U-Net in my [overlay_segmenter](https://github.com/iwanders/overlay_segmenter/).
+It started as a project to gain a better understanding of how (lib/py)torch works under the hood.
+
+This project entails:
+- Idiomatic bindings in [`flash_powder`](./flash_powder).
+- Interop with the [`image`](https://docs.rs/image/latest/image/) crate through [`flash_powder_image`](./flash_powder_image).
+- Interop with the [`safetensors`](https://docs.rs/safetensors/latest/safetensors/) crate through [`flash_powder_safetensors`](./flash_powder_safetensors).
+- Manually written bindings to the C functions in [`torch_stable`](./torch_stable), following upstream's directory structure.
+- [example_vgg](./example_vgg) crate holds an implementation of [vgg11](https://docs.pytorch.org/vision/main/models/generated/torchvision.models.vgg11.html) to show how the `flash_powder::nn` module works.
+- [example_pytorch_extension](./example_pytorch_extension) a PoC pure-Rust PyTorch extension.
+
+Note that the stable ABI doesn't expose all functionality of libtorch, but a surprising amount of functionality is available,
+especially if the goal is just to do inference.
 
 ### Approach
 
@@ -17,8 +24,7 @@ It follows the rust semantics as closely as possible. This means;
 
 - No unsafe in the public interface, safe behaviour as you'd expect.
 - No interior mutability, all methods are const correct.
-- Modifying one tensor will not modify another, unless it has a mutable borrow on the other.
-- Rust style lifetimes on tensors, either tied together with an explicit lifetime, or owning.
+- Rust style lifetimes on tensors, either tied together with an explicit lifetime with a (mutable) borrow, or owning.
 
 There are three structures fundamental to achieving this:
 
@@ -29,14 +35,14 @@ There are three structures fundamental to achieving this:
 Under the hood, each of these is a `StableTensor` and its own tensor handle on the LibTorch side.
 
 This doesn't map perfectly to Torch's operations, for example the `.to()` method in libtorch sometimes returns a copy, but not always.
-So there's some arbitrary choices here, like `.to()` in this crate  always makes a copy.
+To map this to the correct types in Rust we need to ensure that it always returns an owning copy.
 
 ### flash_powder
 
 The main high-level and safe interface lives in the [flash_powder](./flash_powder) crate.
 
 The crate is fairly well documented, here's an overview of existing functionality to get an idea of the semantics as well as the location in crate, most examples are copied from the unit tests.
-All functions or methods that can fail return a `Result`, which when it fails holds an `anyhow::Error` with the message that was returned by the stable API.
+All functions that can fail return a `Result`, wrapping the underlying stable API error in an `anyhow::Error`.
 
 Creating a tensor can be done with the [conversion](flash_powder/src/conversion.rs) module through `TryInto<Tensor>`:
 ```rust
@@ -113,6 +119,10 @@ The [nn::Module](flash_powder/src/nn/module.rs) is the Rust trait equivalent to 
 The `nn` module also provides some helper functionality around the `StateDict`, which dovetails with the `flash_powder_safetensors` crate to be able to load tensors from disk easily.
 
 ### torch_stable
+
+> [!WARNING]
+> Unsafe/Low-Level Bindings, prefer to use `flash_powder` if possible.
+
 Very minimal (handwritten) bindings for the [LibTorch Stable ABI](https://docs.pytorch.org/docs/2.11/notes/libtorch_stable_abi.html).
 This system works through a small set of C functions that provide a limited subset of the functionality from libtorch.
 
@@ -166,7 +176,7 @@ It also handles `[B, C, H, W]`, which creates a row of images, and `[V, B, C, H,
 Additional functionality is provided that's commonly used when handling images:
 
 ```rust
-// You can floatify an image to scale it from integer [0,255] to F32 [0.0, 1.0], you can pass a DType to the ToOptions struct
+// You can floatify an image to scale it from integer types [0,255] to F32 in [0.0, 1.0], you can pass a DType to the ToOptions struct
 // to immediately select another data data and/or device.
 let img = Tensor::read_image(&path)?.image_floatify(&ToOptions::default())?;
 
@@ -261,7 +271,7 @@ For the longest time naming was a bit ad-hoc, but I think uniform emerged:
 ## Testing
 
 I want to ensure that the tensors & function arguments follow conventions from the Python side, so there's a heavy emphasis
-on testing all functions against their Python equivalents. The Python code to test against is interwoven with the Rust
+on testing _all_ functions against their Python equivalents. The Python code to test against is interwoven with the Rust
 code with some helper tooling. Tests should run cleanly in valgrind.
 
 ### Python truth
@@ -332,4 +342,9 @@ These ensure that we ignore some uninitialised values that valgrind finds in the
 Run with these suppressions using valgrind through the runner;
 ```
 ./util/valgrind/valgrind.sh target/debug/deps/torch_stable-5f3b6c1dd8420412
+```
+
+Alternatively, all unit tests can be ran in one go with:
+```
+./util/valgrind/all_tests.sh
 ```

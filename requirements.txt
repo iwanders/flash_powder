@@ -1,2 +1,3 @@
 torch
+# Torchvision only necessary to run the python vgg11 example.
 torchvision
