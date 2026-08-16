@@ -10,6 +10,20 @@ It's full of unsafe, this is really just a test to see whether this was feasible
 
 See [./load.py](load.py) for how this is used from the Python side.
 
+```python
+
+import torch
+
+# Load the library through torch's extension handling.
+sopath = Path(__file__).parent.parent / "target" / "debug"/ "libexample_pytorch_extension.so"
+torch.ops.load_library(str(sopath))
+
+r = torch.ops.extension_from_rust.simple_returns_tensor()
+print(f"simple returns tensor returned {r} with repr: {repr(r)}\n")
+assert isinstance(r, torch.Tensor)
+
+```
+
 ## Notes on C++
 
 The following simple example has quite a bit of macro's going on, they're [here](https://github.com/pytorch/pytorch/blob/v2.13.0/torch/csrc/stable/library.h#L2). 

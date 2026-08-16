@@ -28,7 +28,7 @@ extern "C" fn my_init_function() {
     // Next, we can register a library handle.
     unsafe {
         let mut handle_res: TorchLibraryHandleWrapper = TorchLibraryHandleWrapper::new_null();
-        let ns = c"extension_cpp";
+        let ns = c"extension_from_rust";
         let file = c"thisfile";
         unsafe_call_panic!(aoti_torch_library_init_def(
             ns.as_ptr(),

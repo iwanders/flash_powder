@@ -8,10 +8,10 @@ This was developed for doing postprocessing and inference with an U-Net in my [o
 It started as a project to gain a better understanding of how (lib/py)torch works under the hood.
 
 This project entails:
-- Idiomatic bindings in [`flash_powder`](./flash_powder).
-- Interop with the [`image`](https://docs.rs/image/latest/image/) crate through [`flash_powder_image`](./flash_powder_image).
-- Interop with the [`safetensors`](https://docs.rs/safetensors/latest/safetensors/) crate through [`flash_powder_safetensors`](./flash_powder_safetensors).
-- Manually written bindings to the C functions in [`torch_stable`](./torch_stable), following upstream's directory structure.
+- Idiomatic bindings in [`flash_powder`](./flash_powder/src/).
+- Interop with the [`image`](https://docs.rs/image/latest/image/) crate through [`flash_powder_image`](./flash_powder_image/src/lib.rs).
+- Interop with the [`safetensors`](https://docs.rs/safetensors/latest/safetensors/) crate through [`flash_powder_safetensors`](./flash_powder_safetensors/src/lib.rs).
+- Manually written bindings to the C functions in [`torch_stable`](./torch_stable/src/), following upstream's directory structure.
 - [example_vgg](./example_vgg) crate holds an implementation of [vgg11](https://docs.pytorch.org/vision/main/models/generated/torchvision.models.vgg11.html) to show how the `flash_powder::nn` module works.
 - [example_pytorch_extension](./example_pytorch_extension) a PoC pure-Rust PyTorch extension.
 
