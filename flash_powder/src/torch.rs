@@ -69,6 +69,22 @@ pub fn dstack<T: TensorAccess>(tensors: &[T]) -> StableTorchResult<Tensor> {
     Ok(Tensor::new(r))
 }
 
+/// Concatenates the given sequence of tensors in tensors in the given dimension
+///
+/// - [native_functions.yaml](https://github.com/pytorch/pytorch/blob/v2.12.0-rc2/aten/src/ATen/native/native_functions.yaml#L1433)
+/// - [pytorch equivalent](https://docs.pytorch.org/docs/2.11/generated/torch.cat.html)
+pub fn cat<T>(tensors: &[&T], dim: usize) -> StableTorchResult<Tensor>
+where
+    T: TensorAccess,
+{
+    let mut stack: [StableIValue; 2] =
+        [tensors.iter().map(|z| z.get_tensor()).collect(), dim.into()];
+    unsafe_call_dispatch_bail!("aten::cat", "", stack.as_mut_slice());
+    let r: StableTensor = stack[0].try_into()?;
+
+    Ok(Tensor::new(r))
+}
+
 pub mod cuda {
     /// Return a bool indicating if CUDA is currently available.
     ///
@@ -205,4 +221,38 @@ mod test {
         // And there's -1, but our dim is signed atm.
         Ok(())
     }
+    #[test]
+    fn test_flash_powder_cat() -> StableTorchResult<()> {
+        /*
+            #|PYTHON
+            x = torch.tensor([[1.0, 2.0],[3.0, 4.0]], dtype=torch.float)
+        */
+
+        let d = Tensor::from([[1.0f32, 2.0], [3.0, 4.0]])?;
+        assert_eq!(d.sizes(), &[2, 2]); // #PYTHON list(x.shape)
+        assert_eq!(d.f32s_ref()?, &[1.0f32, 2.0, 3.0, 4.0]); // #PYTHON list(x.view(-1).tolist())
+
+        /*
+            #|PYTHON
+            a = torch.cat([x,x,x], 0)
+        */
+        let a = cat(&[&d, &d, &d], 0)?;
+        assert_eq!(a.sizes(), &[6, 2]); // #PYTHON list(a.shape)
+        assert_eq!(
+            a.f32s_ref()?,
+            &[1.0f32, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0]
+        ); // #PYTHON list(a.view(-1).tolist())
+           /*
+               #|PYTHON
+               b = torch.cat([x,x,x], 1)
+           */
+        let b = cat(&[&d, &d, &d], 1)?;
+        assert_eq!(b.sizes(), &[2, 6]); // #PYTHON list(b.shape)
+        assert_eq!(
+            b.f32s_ref()?,
+            &[1.0f32, 2.0, 1.0, 2.0, 1.0, 2.0, 3.0, 4.0, 3.0, 4.0, 3.0, 4.0]
+        ); // #PYTHON list(b.view(-1).tolist())
+        Ok(())
+    }
+
 }
