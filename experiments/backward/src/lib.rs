@@ -26,6 +26,7 @@ impl GradientThings for Tensor {
         Self: Sized,
     {
         // https://github.com/pytorch/pytorch/blob/v2.13.0/aten/src/ATen/native/native_functions.yaml#L83
+        // Oh, there's also https://github.com/pytorch/pytorch/blob/fbcf2af86ac1fbedee9b65afc428e9ca51ba1fd2/torch/csrc/stable/c/shim.h#L152-L154
         let mut stack: [StableIValue; 2] = [self.get_tensor().into(), true.into()];
         unsafe_call_dispatch_bail!("aten::requires_grad_", "", stack.as_mut_slice());
 
