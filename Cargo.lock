@@ -291,6 +291,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "experiment_backward"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "flash_powder",
+ "flash_powder_image",
+ "flash_powder_safetensors",
+ "image",
+ "torch_stable",
+]
+
+[[package]]
 name = "exr"
 version = "1.74.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

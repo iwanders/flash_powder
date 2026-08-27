@@ -1,0 +1,18 @@
+[package]
+name = "experiment_backward"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+flash_powder = {workspace=true, features=["cuda" ]}
+flash_powder_safetensors = {workspace=true }
+flash_powder_image = {workspace=true }
+torch_stable = {workspace=true }
+anyhow = {workspace=true }
+image = {version="0.25.10", features=["jpeg"]}
+[build-dependencies]
+flash_powder = {workspace=true, features=["cuda" ]}
+
+[lints]
+workspace = true
